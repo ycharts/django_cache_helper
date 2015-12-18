@@ -112,7 +112,7 @@ def _plumb_collections(input_item):
         level += 1
         while True:
             try:
-                current_item = current_iterator.next()
+                current_item = next(current_iterator)
             except StopIteration:
                 level -= 1
                 break
