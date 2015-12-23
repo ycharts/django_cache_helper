@@ -116,7 +116,9 @@ def _plumb_collections(input_item):
             except StopIteration:
                 level -= 1
                 break
-            if hasattr(current_item, '__iter__'):
+            # In py3k hasattr(str, '__iter__')  => True but in python 2 it's False which will break
+            # this if statement. That's why we do `not isinstance(current_item, str)` check as well.
+            if hasattr(current_item, '__iter__') and not isinstance(current_item, str):
                 return_list.append(',')
                 if isinstance(current_item, dict):
                     remains.append(current_iterator)
