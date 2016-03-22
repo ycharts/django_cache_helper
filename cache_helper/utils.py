@@ -24,7 +24,7 @@ def sanitize_key(key, max_length=250):
     # +2 for the colons
     max_length -= (version_length + prefix_length + 2)
     if key_length > max_length:
-        the_hash = sha256(key).hexdigest()
+        the_hash = sha256(key.encode('utf-8')).hexdigest()
         # sha256 always 64 chars.
         key = key[:max_length - 64] + the_hash
     return key
@@ -43,7 +43,7 @@ def _sanitize_args(args=[], kwargs={}):
 
 
 def _func_type(func):
-    argnames = func.func_code.co_varnames[:func.func_code.co_argcount]
+    argnames = func.__code__.co_varnames[:func.__code__.co_argcount]
     if len(argnames) > 0:
         if argnames[0] == 'self':
             return 'method'
@@ -53,8 +53,10 @@ def _func_type(func):
 
 
 def get_normalized_term(term, dash_replacement=''):
-    term = unicode(str(term), encoding='utf-8')
-    term = unicodedata.normalize('NFKD', term).encode('ascii', 'ignore')
+    term = str(term)
+    if isinstance(term, bytes):
+        term = term.decode('utf-8')
+    term = unicodedata.normalize('NFKD', term).encode('ascii', 'ignore').decode('utf-8')
     term = term.lower()
     term = term.strip()
     return term
@@ -62,7 +64,7 @@ def get_normalized_term(term, dash_replacement=''):
 
 def _func_info(func, args):
     func_type = _func_type(func)
-    lineno = ":%s" % func.func_code.co_firstlineno
+    lineno = ":%s" % func.__code__.co_firstlineno
 
     if func_type == 'function':
         name = ".".join([func.__module__, func.__name__]) + lineno
@@ -110,11 +112,13 @@ def _plumb_collections(input_item):
         level += 1
         while True:
             try:
-                current_item = current_iterator.next()
+                current_item = next(current_iterator)
             except StopIteration:
                 level -= 1
                 break
-            if hasattr(current_item, '__iter__'):
+            # In py3k hasattr(str, '__iter__')  => True but in python 2 it's False which will break
+            # this if statement. That's why we do `not isinstance(current_item, str)` check as well.
+            if hasattr(current_item, '__iter__') and not isinstance(current_item, str):
                 return_list.append(',')
                 if isinstance(current_item, dict):
                     remains.append(current_iterator)
