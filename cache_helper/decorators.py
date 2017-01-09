@@ -1,3 +1,5 @@
+from _pylibmc import Error as MemcachedError
+
 from django.core.cache import cache
 from django.utils.functional import wraps
 from cache_helper import utils
@@ -14,6 +16,7 @@ def cached(timeout):
         def wrapper(*args, **kwargs):
             name = utils._func_info(func, args)
             key = get_key(name, func_type, args, kwargs)
+
             try:
                 value = cache.get(key)
             except Exception:
@@ -21,7 +24,12 @@ def cached(timeout):
 
             if value is None:
                 value = func(*args, **kwargs)
-                cache.set(key, value, timeout)
+                # Try and set the key, value pair in the cache.
+                # But if it fails on a Memcached Error handle it.
+                try:
+                    cache.set(key, value, timeout)
+                except MemcachedError:
+                    pass
 
             return value
 
