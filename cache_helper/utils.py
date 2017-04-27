@@ -120,10 +120,30 @@ def _plumb_collections(input_item):
             # this if statement. That's why we do `not isinstance(current_item, str)` check as well.
             if hasattr(current_item, '__iter__') and not isinstance(current_item, str):
                 return_list.append(',')
+
+                # Dictionaries and sets are unordered and can be of various data types
+                # We use the sha256 hash on keys and sort to be deterministic
                 if isinstance(current_item, dict):
+                    hashed_list = []
+
+                    for k, v in current_item.items():
+                        hashed_list.append((sha256(str(k).encode('utf-8')).hexdigest(), v))
+
+                    hashed_list = sorted(hashed_list, key=lambda t: t[0])
                     remains.append(current_iterator)
-                    remains.append([(k,v) for k, v in current_item.items()].__iter__())
+                    remains.append(hashed_list.__iter__())
+
                     level -= 1
+                    break
+                elif isinstance(current_item, set):
+                    hashed_list = []
+
+                    for item in current_item:
+                        hashed_list.append(sha256(str(item).encode('utf-8')).hexdigest())
+
+                    hashed_list = sorted(hashed_list)
+                    remains.append(current_iterator)
+                    remains.append(hashed_list.__iter__())
                     break
                 else:
                     remains.append(current_iterator)
