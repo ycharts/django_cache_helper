@@ -138,8 +138,8 @@ def _plumb_collections(input_item):
                 elif isinstance(current_item, set):
                     hashed_list = []
 
-                    for object in set:
-                        hashed_list.append(sha256(str(object).encode('utf-8')).hexdigest())
+                    for item in current_item:
+                        hashed_list.append(sha256(str(item).encode('utf-8')).hexdigest())
 
                     hashed_list = sorted(hashed_list)
                     remains.append(current_iterator)

@@ -123,8 +123,10 @@ class KeyLengthTestCase(TestCase):
         except Exception:
             self.fail('Keys are not being correctly truncated.')
 
+from hashlib import sha256
 
 class KeyCreationTestCase(TestCase):
+
     def setUp(self):
         self.apple = Fruit('Apple')
         self.cherry = Fruit('Cherry')
@@ -141,7 +143,23 @@ class KeyCreationTestCase(TestCase):
 
     def test_dict_args_properly_convert_to_string(self):
         same_cherry = self.apple.take_then_give_back({1: self.cherry})
-        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,,1,mynameischerry;' in cache)
+        hashed_key = sha256(str(1).encode('utf-8')).hexdigest()
+        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,,{0},mynameischerry;'.format(hashed_key) in cache)
+
+    def test_dict_args_keep_the_same_order_when_convert_to_string(self):
+        dict_arg = {1: self.cherry, 'string': 'ay carambe'}
+        same_multi_dict = self.apple.take_then_give_back(dict_arg)
+
+        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,,'
+                        '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,aycarambe,,'
+                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,mynameischerry;' in cache)
+
+    def test_set_args_properly_maintain_order_and_convert_to_string(self):
+        same_set = self.apple.take_then_give_back({1,'vegetable', self.cherry})
+        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,'
+                        '4715b734085d8d9c9981d91c6d5cff398c75caf44074851baa94f2de24fba4d7,'
+                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,'
+                        'f8201a5264b6b89b4d92c5bc46aa2e5c3e9610e8fc9ef200df1a39c7f10e7af6;' in cache)
 
     def test_list_args_properly_convert_to_string(self):
         same_cherry = self.apple.take_then_give_back([self.cherry])
