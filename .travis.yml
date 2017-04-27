@@ -12,5 +12,6 @@ install:
     - pip install django-nose
     # Install cache helper
     - pip install -e .
+    - pip install pylibmc
 script:
     - python test_project/manage.py test
