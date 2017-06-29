@@ -1,4 +1,7 @@
-from _pylibmc import Error as MemcachedError
+try:
+    from _pylibmc import Error as CacheSetError
+except ImportError:
+    from cache_helper.exceptions import CacheHelperException as CacheSetError
 
 from django.core.cache import cache
 from django.utils.functional import wraps
@@ -25,10 +28,11 @@ def cached(timeout):
             if value is None:
                 value = func(*args, **kwargs)
                 # Try and set the key, value pair in the cache.
-                # But if it fails on a Memcached Error handle it.
+                # But if it fails on an error from the underlying
+                # cache system, handle it.
                 try:
                     cache.set(key, value, timeout)
-                except MemcachedError:
+                except CacheSetError:
                     pass
 
             return value
