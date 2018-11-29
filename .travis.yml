@@ -2,13 +2,13 @@ language: python
 python:
     - 3.4
 env:
-    - DJANGO_VERSION=1.8.17
+    - DJANGO_VERSION=1.8.4
+    - DJANGO_VERSION=1.9.13
 install:
-    # Install django/nose
+    # Install dev requirements for testing
+    - pip install -r dev_requirements.txt
     - pip install Django==$DJANGO_VERSION
-    - pip install django-nose
     # Install cache helper
     - pip install -e .
-    - pip install pylibmc
 script:
     - python test_project/manage.py test

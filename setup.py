@@ -9,7 +9,7 @@ setup(
     url='https://github.com/jb076/django_cache_helper.git',
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'pylibmc'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
