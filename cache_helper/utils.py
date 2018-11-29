@@ -1,4 +1,3 @@
-import unicodedata
 from hashlib import sha256
 
 from django.core.cache import cache
@@ -9,6 +8,16 @@ from cache_helper.exceptions import CacheKeyCreationError
 # List of Control Characters not useable by memcached
 CONTROL_CHARACTERS = set([chr(i) for i in range(0, 33)])
 CONTROL_CHARACTERS.add(chr(127))
+
+
+def get_function_cache_key(func_name, func_type, args, kwargs):
+    if func_type in ['method', 'function']:
+        args_string = _sanitize_args(args, kwargs)
+    elif func_type == 'class_method':
+        args_string = _sanitize_args(args[1:], kwargs)
+    key = '%s%s' % (func_name, args_string)
+    return key
+
 
 def sanitize_key(key, max_length=250):
     """
@@ -33,10 +42,9 @@ def sanitize_key(key, max_length=250):
 def _sanitize_args(args=[], kwargs={}):
     """
     Creates unicode key from all kwargs/args
-        -Note: comma separate args in order to prevent poo(1,2), poo(12, None) corner-case collisions...
+        -Note: comma separate args in order to prevent foo(1,2), foo(12, None) corner-case collisions...
     """
     key = ";{0};{1}"
-    kwargs_key = ""
     args_key = _plumb_collections(args)
     kwargs_key = _plumb_collections(kwargs)
     return key.format(args_key, kwargs_key)
@@ -52,14 +60,11 @@ def _func_type(func):
     return 'function'
 
 
-def get_normalized_term(term, dash_replacement=''):
-    term = str(term)
-    if isinstance(term, bytes):
-        term = term.decode('utf-8')
-    term = unicodedata.normalize('NFKD', term).encode('ascii', 'ignore').decode('utf-8')
-    term = term.lower()
-    term = term.strip()
-    return term
+def get_obj_cache_key(obj):
+    if hasattr(obj, 'get_cache_key'):
+        return obj.get_cache_key()
+    else:
+        return str(obj)
 
 
 def _func_info(func, args):
@@ -76,14 +81,6 @@ def _func_info(func, args):
     name = ".".join([func.__module__, class_name, func.__name__]) + lineno
     return name
 
-
-def _cache_key(func_name, func_type, args, kwargs):
-    if func_type in ['method', 'function']:
-        args_string = _sanitize_args(args, kwargs)
-    elif func_type == 'class_method':
-        args_string = _sanitize_args(args[1:], kwargs)
-    key = '%s%s' % (func_name, args_string)
-    return key
 
 def _plumb_collections(input_item):
     """
@@ -103,7 +100,7 @@ def _plumb_collections(input_item):
         else:
             remains = [input_item.__iter__()]
     else:
-        return get_normalized_term(input_item)
+        return get_obj_cache_key(input_item)
 
     while len(remains) > 0:
         if settings.MAX_DEPTH is not None and level > settings.MAX_DEPTH:
@@ -150,7 +147,7 @@ def _plumb_collections(input_item):
                     remains.append(current_item.__iter__())
                     break
             else:
-                current_item_string = '{0},'.format(get_normalized_term(current_item))
+                current_item_string = '{0},'.format(get_obj_cache_key(current_item))
                 return_list.append(current_item_string)
                 continue
     # trim trailing comma

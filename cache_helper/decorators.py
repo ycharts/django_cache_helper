@@ -10,9 +10,10 @@ from cache_helper import utils
 
 def cached(timeout):
     def get_key(*args, **kwargs):
-        return utils.sanitize_key(utils._cache_key(*args, **kwargs))
+        function_cache_key = utils.get_function_cache_key(*args, **kwargs)
+        return utils.sanitize_key(function_cache_key)
 
-    def _cached(func, *args):
+    def _cached(func):
         func_type = utils._func_type(func)
 
         @wraps(func)
@@ -41,6 +42,8 @@ def cached(timeout):
             name = utils._func_info(func, args)
             key = get_key(name, func_type, args, kwargs)
             cache.delete(key)
+
         wrapper.invalidate = invalidate
         return wrapper
+
     return _cached
