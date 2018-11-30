@@ -4,19 +4,27 @@ from django.core.cache import cache
 
 from cache_helper import settings
 from cache_helper.exceptions import CacheKeyCreationError
+from cache_helper.interfaces import CacheHelperCacheable
 
 # List of Control Characters not useable by memcached
 CONTROL_CHARACTERS = set([chr(i) for i in range(0, 33)])
 CONTROL_CHARACTERS.add(chr(127))
 
 
-def get_function_cache_key(func_name, func_type, args, kwargs):
+def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     if func_type in ['method', 'function']:
-        args_string = _sanitize_args(args, kwargs)
+        args_string = _sanitize_args(*func_args, **func_kwargs)
     elif func_type == 'class_method':
-        args_string = _sanitize_args(args[1:], kwargs)
+        args_string = _sanitize_args(func_args[0][1:], **func_kwargs)
     key = '%s%s' % (func_name, args_string)
     return key
+
+
+def get_object_cache_key(obj):
+    if isinstance(obj, CacheHelperCacheable):
+        return obj.get_cache_helper_key()
+    else:
+        return str(obj)
 
 
 def sanitize_key(key, max_length=250):
@@ -60,13 +68,6 @@ def _func_type(func):
     return 'function'
 
 
-def get_obj_cache_key(obj):
-    if hasattr(obj, 'get_cache_key'):
-        return obj.get_cache_key()
-    else:
-        return str(obj)
-
-
 def _func_info(func, args):
     func_type = _func_type(func)
     lineno = ":%s" % func.__code__.co_firstlineno
@@ -93,18 +94,19 @@ def _plumb_collections(input_item):
     if hasattr(input_item, '__iter__'):
         if isinstance(input_item, dict):
             # Py3k Compatibility nonsense...
-            remains = [[(k,v) for k, v in input_item.items()].__iter__()]
+            remains = [[(k, v) for k, v in input_item.items()].__iter__()]
             # because dictionary iterators yield tuples, it would appear
             # to be 2 levels per dictionary, but that seems unexpected.
             level -= 1
         else:
             remains = [input_item.__iter__()]
     else:
-        return get_obj_cache_key(input_item)
+        return get_object_cache_key(input_item)
 
     while len(remains) > 0:
         if settings.MAX_DEPTH is not None and level > settings.MAX_DEPTH:
-            raise CacheKeyCreationError('Function args or kwargs have too many nested collections for current MAX_DEPTH')
+            raise CacheKeyCreationError(
+                'Function args or kwargs have too many nested collections for current MAX_DEPTH')
         current_iterator = remains.pop()
         level += 1
         while True:
@@ -147,7 +149,7 @@ def _plumb_collections(input_item):
                     remains.append(current_item.__iter__())
                     break
             else:
-                current_item_string = '{0},'.format(get_obj_cache_key(current_item))
+                current_item_string = '{0},'.format(get_object_cache_key(current_item))
                 return_list.append(current_item_string)
                 continue
     # trim trailing comma

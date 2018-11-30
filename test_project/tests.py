@@ -1,15 +1,14 @@
-"""
-This file demonstrates writing tests using the unittest module. These will pass
-when you run "manage.py test".
+from hashlib import sha256
 
-"""
 from django.test import TestCase
 from django.core.cache import cache
 
 from cache_helper import settings
 from cache_helper.decorators import cached
+from cache_helper.interfaces import CacheHelperCacheable
 from cache_helper.utils import _func_type
 from cache_helper.exceptions import CacheKeyCreationError
+
 
 @cached(60*60)
 def foo(a, b):
@@ -56,6 +55,23 @@ class Fruit(object):
         return cls.__name__ + a
 
 
+class Meat(CacheHelperCacheable):
+    def __init__(self, name, grams_protein):
+        self.name = name
+        self.grams_protein = grams_protein
+
+    def __str__(self):
+        return 'MyNameIs{0}'.format(self.name)
+
+    def get_cache_helper_key(self):
+        return '{name}:{grams_protein}'.format(name=self.name, grams_protein=self.grams_protein)
+
+    @staticmethod
+    @cached(60*5)
+    def get_grams_protein(meat):
+        return meat.grams_protein
+
+
 class FuncTypeTest(TestCase):
     """
     Test make sure functions catch right type
@@ -77,8 +93,9 @@ class FuncTypeTest(TestCase):
 
 class BasicCacheTestCase(TestCase):
     def test_function_cache(self):
-        x = foo(1, 2)
-        self.assertTrue('tests.foo:14;1,2;' in cache)
+        foo(1, 2)
+        self.assertTrue('tests.foo:13;1,2;' in cache)
+
 
 class MultipleCallsDiffParamsTestCase(TestCase):
     @classmethod
@@ -99,13 +116,14 @@ class MultipleCallsDiffParamsTestCase(TestCase):
         self.assertEqual(self.cherry.fun_math(15, 10), cherry_val)
 
     def test_class_method(self):
-        apple_val = Fruit.add_sweet_letter('a')
-        cherry_val = Fruit.add_sweet_letter('c')
+        Fruit.add_sweet_letter('a')
+        Fruit.add_sweet_letter('c')
 
-        self.assertTrue("tests.Fruit.add_sweet_letter:53;a;" in cache)
-        self.assertTrue("tests.Fruit.add_sweet_letter:53;c;" in cache)
+        self.assertTrue("tests.Fruit.add_sweet_letter:52;a;" in cache)
+        self.assertTrue("tests.Fruit.add_sweet_letter:52;c;" in cache)
         self.assertEqual(Fruit.add_sweet_letter('a'), 'Fruita')
         self.assertEqual(Fruit.add_sweet_letter('c'), 'Fruitc')
+
 
 class KeyLengthTestCase(TestCase):
     @classmethod
@@ -123,7 +141,6 @@ class KeyLengthTestCase(TestCase):
         except Exception:
             self.fail('Keys are not being correctly truncated.')
 
-from hashlib import sha256
 
 class KeyCreationTestCase(TestCase):
 
@@ -138,35 +155,52 @@ class KeyCreationTestCase(TestCase):
         """
         Surface level objects are serialized correctly with default settings...
         """
-        same_cherry = self.apple.take_then_give_back(self.cherry)
-        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,mynameischerry;' in cache)
+        self.apple.take_then_give_back(self.cherry)
+        self.assertTrue('tests.Fruit.take_then_give_back:41;MyNameIsApple,MyNameIsCherry;' in cache)
 
     def test_dict_args_properly_convert_to_string(self):
-        same_cherry = self.apple.take_then_give_back({1: self.cherry})
+        self.apple.take_then_give_back({1: self.cherry})
         hashed_key = sha256(str(1).encode('utf-8')).hexdigest()
-        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,,{0},mynameischerry;'.format(hashed_key) in cache)
+        self.assertTrue('tests.Fruit.take_then_give_back:41;MyNameIsApple,,,{0},MyNameIsCherry;'.format(hashed_key) in cache)
 
     def test_dict_args_keep_the_same_order_when_convert_to_string(self):
         dict_arg = {1: self.cherry, 'string': 'ay carambe'}
-        same_multi_dict = self.apple.take_then_give_back(dict_arg)
+        self.apple.take_then_give_back(dict_arg)
 
-        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,,'
+        self.assertTrue('tests.Fruit.take_then_give_back:41;MyNameIsApple,,,'
                         '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,aycarambe,,'
-                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,mynameischerry;' in cache)
+                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,MyNameIsCherry;' in cache)
 
     def test_set_args_properly_maintain_order_and_convert_to_string(self):
-        same_set = self.apple.take_then_give_back({1,'vegetable', self.cherry})
-        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,'
+        self.apple.take_then_give_back({1,'vegetable', self.cherry})
+        self.assertTrue('tests.Fruit.take_then_give_back:41;MyNameIsApple,,'
                         '4715b734085d8d9c9981d91c6d5cff398c75caf44074851baa94f2de24fba4d7,'
                         '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,'
                         'f8201a5264b6b89b4d92c5bc46aa2e5c3e9610e8fc9ef200df1a39c7f10e7af6;' in cache)
 
     def test_list_args_properly_convert_to_string(self):
-        same_cherry = self.apple.take_then_give_back([self.cherry])
-        self.assertTrue('tests.Fruit.take_then_give_back:42;mynameisapple,,mynameischerry;' in cache)
+        self.apple.take_then_give_back([self.cherry])
+        self.assertTrue('tests.Fruit.take_then_give_back:41;MyNameIsApple,,MyNameIsCherry;' in cache)
 
     def test_raises_depth_error(self):
         settings.MAX_DEPTH = 0
         with self.assertRaises(CacheKeyCreationError):
-            same_cherry = self.apple.take_then_give_back([self.cherry])
+            self.apple.take_then_give_back([self.cherry])
+
+
+class CacheableTestCase(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        cls.chicken = Meat(name='Chicken', grams_protein=20)
+        cls.steak = Meat(name='Steak', grams_protein=26)
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def test_cacheable_key_creation(self):
+        Meat.get_grams_protein(self.chicken)
+        cache_key = Meat.get_grams_protein.get_cache_key(self.chicken)
+        self.assertTrue(cache_key in cache)
 

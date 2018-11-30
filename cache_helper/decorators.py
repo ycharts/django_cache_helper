@@ -9,20 +9,20 @@ from cache_helper import utils
 
 
 def cached(timeout):
-    def get_key(*args, **kwargs):
-        function_cache_key = utils.get_function_cache_key(*args, **kwargs)
-        return utils.sanitize_key(function_cache_key)
-
     def _cached(func):
         func_type = utils._func_type(func)
 
+        def _get_cache_key(func_name, *args, **kwargs):
+            function_cache_key = utils.get_function_cache_key(func_name, func_type, args, kwargs)
+            return utils.sanitize_key(function_cache_key)
+
         @wraps(func)
         def wrapper(*args, **kwargs):
-            name = utils._func_info(func, args)
-            key = get_key(name, func_type, args, kwargs)
+            func_name = utils._func_info(func, args)
+            cache_key = _get_cache_key(func_name, args, kwargs)
 
             try:
-                value = cache.get(key)
+                value = cache.get(cache_key)
             except Exception:
                 value = None
 
@@ -32,17 +32,29 @@ def cached(timeout):
                 # But if it fails on an error from the underlying
                 # cache system, handle it.
                 try:
-                    cache.set(key, value, timeout)
+                    cache.set(cache_key, value, timeout)
                 except CacheSetError:
                     pass
 
             return value
 
-        def invalidate(*args, **kwargs):
-            name = utils._func_info(func, args)
-            key = get_key(name, func_type, args, kwargs)
-            cache.delete(key)
+        def get_cache_key(*args, **kwargs):
+            func_name = utils._func_info(func, args)
+            cache_key = _get_cache_key(func_name, args, kwargs)
+            return cache_key
 
+        def invalidate(*args, **kwargs):
+            """
+            Remove value from cache using same args to the wrapped function originally supplied.
+            For example, if you initially made a function call foo('hello', 5) which resulted
+            in some value being stored inside the cache, you would call foo.invalidate('hello', 5)
+            to remove that value.
+            """
+            func_name = utils._func_info(func, args)
+            cache_key = _get_cache_key(func_name, func_type, args, kwargs)
+            cache.delete(cache_key)
+
+        wrapper.get_cache_key = get_cache_key
         wrapper.invalidate = invalidate
         return wrapper
 
