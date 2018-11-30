@@ -2,12 +2,16 @@ language: python
 python:
     - 3.4
 env:
+    - DJANGO_VERSION=1.7.10
     - DJANGO_VERSION=1.8.4
     - DJANGO_VERSION=1.9.13
+    - DJANGO_VERSION=1.10.8
+    - DJANGO_VERSION=1.11.12
+    - DJANGO_VERSION=2.0.4
 install:
+    - pip install -r requirements.txt
     # Install dev requirements for testing
     - pip install -r dev_requirements.txt
-    - pip install Django==$DJANGO_VERSION
     # Install cache helper
     - pip install -e .
 script:
