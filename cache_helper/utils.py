@@ -25,19 +25,6 @@ def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     return key
 
 
-def get_object_cache_key(obj):
-    """
-    Function used to get the individual cache key for objects. Checks if the
-    object is an instance of CacheHelperCacheable, which means it will have a
-    get_cache_helper_key function defined for it which will be used as the key.
-    Otherwise, just uses the string representation of the object.
-    """
-    if isinstance(obj, CacheHelperCacheable):
-        return obj.get_cache_helper_key()
-    else:
-        return str(obj)
-
-
 def sanitize_key(key, max_length=250):
     """
     Truncates key to keep it under memcached char limit.  Replaces with hash.
@@ -112,7 +99,7 @@ def _plumb_collections(input_item):
         else:
             remains = [input_item.__iter__()]
     else:
-        return get_object_cache_key(input_item)
+        return _get_object_cache_key(input_item)
 
     while len(remains) > 0:
         if settings.MAX_DEPTH is not None and level > settings.MAX_DEPTH:
@@ -160,10 +147,23 @@ def _plumb_collections(input_item):
                     remains.append(current_item.__iter__())
                     break
             else:
-                current_item_string = '{0},'.format(get_object_cache_key(current_item))
+                current_item_string = '{0},'.format(_get_object_cache_key(current_item))
                 return_list.append(current_item_string)
                 continue
     # trim trailing comma
     return_string = ''.join(return_list)
     # trim last ',' because it lacks significant meaning.
     return return_string[:-1]
+
+
+def _get_object_cache_key(obj):
+    """
+    Function used to get the individual cache key for objects. Checks if the
+    object is an instance of CacheHelperCacheable, which means it will have a
+    get_cache_helper_key function defined for it which will be used as the key.
+    Otherwise, just uses the string representation of the object.
+    """
+    if isinstance(obj, CacheHelperCacheable):
+        return obj.get_cache_helper_key()
+    else:
+        return str(obj)
