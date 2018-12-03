@@ -68,16 +68,17 @@ def _func_type(func):
 
 def _func_info(func, args):
     func_type = _func_type(func)
-    lineno = ":%s" % func.__code__.co_firstlineno
 
     if func_type == 'function':
-        name = ".".join([func.__module__, func.__name__]) + lineno
+        name = ".".join([func.__module__, func.__name__])
         return name
     elif func_type == 'class_method':
         class_name = args[0].__name__
-    else:
-        class_name = args[0].__class__.__name__
-    name = ".".join([func.__module__, class_name, func.__name__]) + lineno
+    elif func_type == 'method':
+        name = '{func_module}.{qualified_name}'\
+            .format(func_module=func.__module__, qualified_name=func.__qualname__)
+        return name
+    name = ".".join([func.__module__, class_name, func.__name__])
     return name
 
 
