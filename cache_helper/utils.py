@@ -15,12 +15,23 @@ def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     if func_type in ['method', 'function']:
         args_string = _sanitize_args(*func_args, **func_kwargs)
     elif func_type == 'class_method':
+        # In this case, func_args is the tuple (args, kwargs) so we get the
+        # args by getting the zero index element. Next, because the func_type
+        # is a class_method, the first argument will be the class used followed by
+        # the actual arguments. We are not interested in the class, only method arguments,
+        # which is why we slice from index 1
         args_string = _sanitize_args(func_args[0][1:], **func_kwargs)
     key = '%s%s' % (func_name, args_string)
     return key
 
 
 def get_object_cache_key(obj):
+    """
+    Function used to get the individual cache key for objects. Checks if the
+    object is an instance of CacheHelperCacheable, which means it will have a
+    get_cache_helper_key function defined for it which will be used as the key.
+    Otherwise, just uses the string representation of the object.
+    """
     if isinstance(obj, CacheHelperCacheable):
         return obj.get_cache_helper_key()
     else:
