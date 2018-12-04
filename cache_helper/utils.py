@@ -32,6 +32,7 @@ def sanitize_key(key, max_length=250):
     Remove control characters b/c of memcached restriction on control chars.
     """
     key = ''.join([c for c in key if c not in CONTROL_CHARACTERS])
+    key = 'django_cache_helper:' + key
     key_length = len(key)
     # django memcached backend will, by default, add a prefix. Account for this in max
     # key length. '%s:%s:%s'.format()

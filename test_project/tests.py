@@ -125,7 +125,7 @@ class FuncTypeTest(TestCase):
 class BasicCacheTestCase(TestCase):
     def test_function_cache(self):
         foo(1, 2)
-        self.assertTrue('tests.foo;1,2;' in cache)
+        self.assertTrue('django_cache_helper:tests.foo;1,2;' in cache)
 
 
 class MultipleCallsDiffParamsTestCase(TestCase):
@@ -150,8 +150,8 @@ class MultipleCallsDiffParamsTestCase(TestCase):
         Fruit.add_sweet_letter('a')
         Fruit.add_sweet_letter('c')
 
-        self.assertTrue("tests.Fruit.add_sweet_letter;a;" in cache)
-        self.assertTrue("tests.Fruit.add_sweet_letter;c;" in cache)
+        self.assertTrue("django_cache_helper:tests.Fruit.add_sweet_letter;a;" in cache)
+        self.assertTrue("django_cache_helper:tests.Fruit.add_sweet_letter;c;" in cache)
         self.assertEqual(Fruit.add_sweet_letter('a'), 'Fruita')
         self.assertEqual(Fruit.add_sweet_letter('c'), 'Fruitc')
 
@@ -225,31 +225,31 @@ class KeyCreationTestCase(TestCase):
         Surface level objects are serialized correctly with default settings...
         """
         self.apple.take_then_give_back(self.cherry)
-        self.assertTrue('tests.Fruit.take_then_give_back;MyNameIsApple,MyNameIsCherry;' in cache)
+        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,MyNameIsCherry;' in cache)
 
     def test_dict_args_properly_convert_to_string(self):
         self.apple.take_then_give_back({1: self.cherry})
         hashed_key = sha256(str(1).encode('utf-8')).hexdigest()
-        self.assertTrue('tests.Fruit.take_then_give_back;MyNameIsApple,,,{0},MyNameIsCherry;'.format(hashed_key) in cache)
+        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,,{0},MyNameIsCherry;'.format(hashed_key) in cache)
 
     def test_dict_args_keep_the_same_order_when_convert_to_string(self):
         dict_arg = {1: self.cherry, 'string': 'ay carambe'}
         self.apple.take_then_give_back(dict_arg)
 
-        self.assertTrue('tests.Fruit.take_then_give_back;MyNameIsApple,,,'
+        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,,'
                         '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,aycarambe,,'
                         '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,MyNameIsCherry;' in cache)
 
     def test_set_args_properly_maintain_order_and_convert_to_string(self):
         self.apple.take_then_give_back({1,'vegetable', self.cherry})
-        self.assertTrue('tests.Fruit.take_then_give_back;MyNameIsApple,,'
+        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,'
                         '4715b734085d8d9c9981d91c6d5cff398c75caf44074851baa94f2de24fba4d7,'
-                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,'
-                        'f8201a5264b6b89b4d92c5bc46aa2e5c3e9610e8fc9ef200df1a39c7f10e7af6;' in cache)
+                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c018a26f860f326e'
+                        '47b45ae7eee0d2dd530dcbaaca886cd1733d9e53dcd001c49be' in cache)
 
     def test_list_args_properly_convert_to_string(self):
         self.apple.take_then_give_back([self.cherry])
-        self.assertTrue('tests.Fruit.take_then_give_back;MyNameIsApple,,MyNameIsCherry;' in cache)
+        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,MyNameIsCherry;' in cache)
 
     def test_raises_depth_error(self):
         settings.MAX_DEPTH = 0
