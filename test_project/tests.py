@@ -73,7 +73,7 @@ class Fruit(object):
         return False
 
     @classmethod
-    @cached(60 * 60)
+    @cached(60*60)
     def add_sweet_letter(cls, a):
         return cls.__name__ + a
 
