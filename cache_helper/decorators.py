@@ -26,7 +26,7 @@ def cached(timeout):
             function. For example, calling foo.get_cache_key('hello', 5) would not call foo - it would just
             return the cache key that would be used if you were to call foo with the same args/kwargs.
             """
-            func_name = utils._func_info(func, args)
+            func_name = utils._func_info(func)
             cache_key = _get_cache_key(func_name, args, kwargs)
             return cache_key
 

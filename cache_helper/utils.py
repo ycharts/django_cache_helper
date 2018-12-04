@@ -1,4 +1,5 @@
 from hashlib import sha256
+import inspect
 
 from django.core.cache import cache
 
@@ -57,29 +58,35 @@ def _sanitize_args(args=[], kwargs={}):
 
 
 def _func_type(func):
-    argnames = func.__code__.co_varnames[:func.__code__.co_argcount]
-    if len(argnames) > 0:
-        if argnames[0] == 'self':
-            return 'method'
-        elif argnames[0] == 'cls':
+    """
+    Gets the type of the given function
+    """
+    if inspect.ismethod(func):
+        # If the self attribute of the function is a class, it must be a class method
+        # Otherwise, it will be an instance method of some class, so just a regular method
+        if inspect.isclass(func.__self__):
             return 'class_method'
-    return 'function'
+        else:
+            return 'method'
+
+    # Covers case when a class method is decorated
+    if 'cls' in inspect.getargspec(func).args:
+        return 'class_method'
+
+    if inspect.isfunction(func):
+        return 'function'
+
+    return None
 
 
-def _func_info(func, args):
+def _func_info(func):
     func_type = _func_type(func)
 
-    if func_type == 'function':
-        name = ".".join([func.__module__, func.__name__])
-        return name
-    elif func_type == 'class_method':
-        class_name = args[0].__name__
-    elif func_type == 'method':
+    if func_type in ['method', 'class_method', 'function']:
         name = '{func_module}.{qualified_name}'\
             .format(func_module=func.__module__, qualified_name=func.__qualname__)
         return name
-    name = ".".join([func.__module__, class_name, func.__name__])
-    return name
+    return ''
 
 
 def _plumb_collections(input_item):
