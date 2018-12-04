@@ -22,14 +22,32 @@ class Vegetable(object):
     def fun_math(self, a, b):
         return a + b
 
-    @classmethod
-    @cached
-    def add_sweet_letter(cls, a):
-        return cls.__name__ + a
-
     @cached(60*60)
     def take_then_give_back(self, a):
         return a
+
+    @cached(60*60)
+    def instance_method(self):
+        return self.name
+
+    @classmethod
+    def class_method(cls):
+        return cls
+
+    @classmethod
+    @cached(60*60)
+    def add_sweet_letter(cls, a):
+        return cls.__name__ + a
+
+    @staticmethod
+    @cached(60*60)
+    def static_method(a):
+        return a
+
+    @staticmethod
+    @cached(60*60)
+    def foo(a, b):
+        return a + b
 
 
 class Fruit(object):
@@ -55,9 +73,14 @@ class Fruit(object):
         return False
 
     @classmethod
-    @cached(60*60)
+    @cached(60 * 60)
     def add_sweet_letter(cls, a):
         return cls.__name__ + a
+
+    @staticmethod
+    @cached(60*60)
+    def static_method(a):
+        return a
 
 
 class Meat(CacheHelperCacheable):
@@ -86,14 +109,17 @@ class FuncTypeTest(TestCase):
     def assertFuncType(self, func, tp):
         self.assertEqual(_func_type(func), tp)
 
-    def test_func(self):
+    def test_module_func(self):
         self.assertFuncType(foo, 'function')
 
-    def test_meth(self):
-        self.assertFuncType(self.celery.fun_math, 'method')
+    def test_instance_method(self):
+        self.assertFuncType(self.celery.instance_method, 'method')
 
-    def test_cls(self):
-        self.assertFuncType(Vegetable.add_sweet_letter, 'class_method')
+    def test_static_method(self):
+        self.assertFuncType(Vegetable.static_method, 'function')
+
+    def test_class_method(self):
+        self.assertFuncType(Vegetable.class_method, 'class_method')
 
 
 class BasicCacheTestCase(TestCase):
@@ -169,13 +195,30 @@ class KeyCreationTestCase(TestCase):
         """
         Two different classes with the same class method name should have different cache keys
         """
-        pass
+        apple_add_sweet_cherry_key = self.apple.add_sweet_letter.get_cache_key(self.cherry)
+        celery_add_sweet_cherry_key = self.celery.add_sweet_letter.get_cache_key(self.cherry)
+        self.assertNotEqual(apple_add_sweet_cherry_key, celery_add_sweet_cherry_key)
 
-    def test_same_static_method_name_different_class(self):
+    def test_same_static_method_name_different_class_instance_reference(self):
         """
         Two different classes with the same static method name should have different cache keys
         """
-        pass
+        apple_static_method_key = self.apple.static_method.get_cache_key(self.cherry)
+        celery_static_method_key = self.celery.static_method.get_cache_key(self.cherry)
+        self.assertNotEqual(apple_static_method_key, celery_static_method_key)
+
+    def test_same_static_method_name_different_class_class_reference(self):
+        """
+        Two different classes with the same static method name should have different cache keys
+        """
+        fruit_static_method_key = Fruit.static_method.get_cache_key(self.cherry)
+        vegetable_static_method_key = Vegetable.static_method.get_cache_key(self.cherry)
+        self.assertNotEqual(fruit_static_method_key, vegetable_static_method_key)
+
+    def test_same_function_name_from_module_level(self):
+        vegetable_static_method_key = Vegetable.foo.get_cache_key(1, 2)
+        module_level_key = foo.get_cache_key(1, 2)
+        self.assertNotEqual(vegetable_static_method_key, module_level_key)
 
     def test_args_kwargs_properly_convert_to_string(self):
         """
