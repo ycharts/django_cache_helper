@@ -11,6 +11,8 @@ from cache_helper.interfaces import CacheHelperCacheable
 CONTROL_CHARACTERS = set([chr(i) for i in range(0, 33)])
 CONTROL_CHARACTERS.add(chr(127))
 
+DJANGO_CACHE_HELPER_PREFIX = 'cache_helper_prefix'
+
 
 def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     if func_type in ['method', 'function']:
@@ -22,7 +24,7 @@ def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
         # the actual arguments. We are not interested in the class, only method arguments,
         # which is why we slice from index 1
         args_string = _sanitize_args(func_args[0][1:], **func_kwargs)
-    key = '%s%s' % (func_name, args_string)
+    key = '{func_name}{args_string}'.format(func_name=func_name, args_string=args_string)
     return key
 
 
@@ -32,7 +34,7 @@ def sanitize_key(key, max_length=250):
     Remove control characters b/c of memcached restriction on control chars.
     """
     key = ''.join([c for c in key if c not in CONTROL_CHARACTERS])
-    key = 'django_cache_helper:' + key
+    key = '{cache_helper_prefix}:{key}'.format(cache_helper_prefix=DJANGO_CACHE_HELPER_PREFIX, key=key)
     # django memcached backend will, by default, add a prefix. Account for this in max
     # key length. '%s:%s:%s'.format()
     version_length = len(str(getattr(cache, 'version', '')))
@@ -51,10 +53,10 @@ def _sanitize_args(args=[], kwargs={}):
     Creates unicode key from all kwargs/args
         -Note: comma separate args in order to prevent foo(1,2), foo(12, None) corner-case collisions...
     """
-    key = ";{0};{1}"
+    key = ";{args_key};{kwargs_key}"
     args_key = _plumb_collections(args)
     kwargs_key = _plumb_collections(kwargs)
-    return key.format(args_key, kwargs_key)
+    return key.format(args_key=args_key, kwargs_key=kwargs_key)
 
 
 def _func_type(func):
