@@ -283,9 +283,9 @@ class CacheableTestCase(CacheHelperTestBase):
         An instance of a class that implements the CacheHelperCacheable class should use the get_cache_helper_key
         """
         Meat.get_grams_protein(self.chicken)
-        grams_protein_chicken_key = 'tests.Meat.get_grams_protein;Chicken:20;'
-        self.assertTrue(self.chicken.get_cache_helper_key() in grams_protein_chicken_key)
-        self.assertKeyInCache(grams_protein_chicken_key)
+        expected_cache_key = 'tests.Meat.get_grams_protein;Chicken:20;'
+        self.assertTrue(self.chicken.get_cache_helper_key() in expected_cache_key)
+        self.assertKeyInCache(expected_cache_key)
 
     def test_key_for_cacheable_function_with_mixed_cacheable_args(self):
         """
@@ -323,3 +323,10 @@ class CacheableTestCase(CacheHelperTestBase):
                              ',,8a332387e40497a972a0ab2099659b49b99be0d00130158f9cb92ecc93ca5b18,Terrible;'
         self.assertKeyInCache(expected_cache_key)
 
+    def test_key_for_function_with_cache_helper_cacheable_object_as_kwarg(self):
+        """
+        Test when a cached function is called with a CacheHelperCacheable object as a kwarg
+        """
+        Meat.get_grams_protein(meat=self.chicken)
+        expected_cache_key = 'tests.Meat.get_grams_protein;;,meat,Chicken:20'
+        self.assertKeyInCache(expected_cache_key)
