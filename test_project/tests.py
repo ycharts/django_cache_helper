@@ -1,5 +1,7 @@
 from hashlib import sha256
 
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.core.cache import cache
 
@@ -29,6 +31,9 @@ class CacheHelperTestBase(TestCase):
     @classmethod
     def tearDownClass(cls):
         pass
+
+    def tearDown(self):
+        cache.clear()
 
     def assertKeyInCache(self, key):
         sanitized_key = sanitize_key(key)
@@ -286,6 +291,36 @@ class CacheableTestCase(CacheHelperTestBase):
         expected_cache_key = 'tests.Meat.get_grams_protein;Chicken:20;'
         self.assertTrue(self.chicken.get_cache_helper_key() in expected_cache_key)
         self.assertKeyInCache(expected_cache_key)
+
+    @patch('tests.Meat.get_grams_protein', return_value=20)
+    @patch('cache_helper.utils._func_type', return_value='function')
+    def test_decorator_only_calls_function_once_if_value_cached(self, _, mock_get_grams_protein):
+        """
+        If decorated function was already called with same args, decorator won't call wrapped function twice
+        """
+        # Set qualname since internal function uses it
+        mock_get_grams_protein.__qualname__ = 'tests.Meat.get_grams_protein'
+        decorated_mock_grams_protein = cached(timeout=5*60)(mock_get_grams_protein)
+        decorated_mock_grams_protein(self.chicken)
+        # Call the function twice with the same args
+        decorated_mock_grams_protein(self.chicken)
+        # calling the decorated mock function twice with the same args should only call the mock function once
+        # as the return value should be stored inside the cache
+        self.assertEqual(mock_get_grams_protein.call_count, 1)
+
+    @patch('tests.Meat.get_grams_protein', return_value=20)
+    @patch('cache_helper.utils._func_type', return_value='function')
+    def test_decorator_only_calls_function_twice_when_supplied_different_args(self, _, mock_get_grams_protein):
+        """
+        Decorator calls function twice when supplied with different args
+        """
+        # Set qualname since internal function uses it
+        mock_get_grams_protein.__qualname__ = 'tests.Meat.get_grams_protein'
+        decorated_mock_grams_protein = cached(timeout=5*60)(mock_get_grams_protein)
+        decorated_mock_grams_protein(self.chicken)
+        # Call the function with different args to see if function will be called again
+        decorated_mock_grams_protein(self.steak)
+        self.assertEqual(mock_get_grams_protein.call_count, 2)
 
     def test_key_for_cacheable_function_with_mixed_cacheable_args(self):
         """
