@@ -39,6 +39,9 @@ class Vegetable(object):
     def __init__(self, name):
         self.name = name
 
+    def __str__(self):
+        return 'MyNameIs{0}'.format(self.name)
+
     def fun_math(self, a, b):
         return a + b
 
@@ -118,6 +121,16 @@ class Meat(CacheHelperCacheable):
     @cached(60*5)
     def get_grams_protein(meat):
         return meat.grams_protein
+
+    @staticmethod
+    @cached(60*60)
+    def get_tastier_option(meat, veggie):
+        return meat
+
+    @staticmethod
+    @cached(60*60)
+    def get_protein_sum(meats):
+        return sum(meat.grams_protein for meat in meats)
 
 
 class FuncTypeTest(CacheHelperTestBase):
@@ -265,7 +278,48 @@ class KeyCreationTestCase(CacheHelperTestBase):
 
 class CacheableTestCase(CacheHelperTestBase):
 
-    def test_cacheable_key_creation(self):
+    def test_key_for_function_with_cache_helper_cacheable_arg(self):
+        """
+        An instance of a class that implements the CacheHelperCacheable class should use the get_cache_helper_key
+        """
         Meat.get_grams_protein(self.chicken)
         grams_protein_chicken_key = 'tests.Meat.get_grams_protein;Chicken:20;'
+        self.assertTrue(self.chicken.get_cache_helper_key() in grams_protein_chicken_key)
         self.assertKeyInCache(grams_protein_chicken_key)
+
+    def test_key_for_cacheable_function_with_mixed_cacheable_args(self):
+        """
+        Test when a cached function takes in both a CacheHelperCacheable object and a regular object
+        """
+        Meat.get_tastier_option(self.chicken, self.celery)
+        expected_cache_key = 'tests.Meat.get_tastier_option;Chicken:20,MyNameIsCelery;'
+        self.assertKeyInCache(expected_cache_key)
+
+    def test_key_for_list_of_cacheable_objects(self):
+        """
+        Test when a cached function takes in a list of CacheHelperCacheable objects
+        """
+        Meat.get_protein_sum([self.chicken, self.steak])
+        expected_cache_key = 'tests.Meat.get_protein_sum;,Chicken:20,Steak:26;'
+        self.assertKeyInCache(expected_cache_key)
+
+    def test_key_for_set_of_cacheable_objects(self):
+        """
+        Test when a cached function takes in a set of CacheHelperCacheable objects
+        """
+        Meat.get_protein_sum({self.steak, self.chicken})
+        expected_cache_key = 'tests.Meat.get_protein_sum;,' \
+                             '6dd472107034f41f27f301ddbcc97ba4bc0d54945e759d170268aa1091c436fe,' \
+                             '9ff36157b4df732256fe3b151cbf8a6bdcc22969d4d6ceaad588bccbbd5c942f;'
+        self.assertKeyInCache(expected_cache_key)
+
+    def test_key_for_dict_of_cacheable_objects(self):
+        """
+        Test when a cached function takes in a dict with CacheHelperCacheable objects as keys
+        """
+        Meat.get_tastier_option({self.chicken: 'Tasty'}, {self.celery: 'Terrible'})
+        expected_cache_key = 'tests.Meat.get_tastier_option;' \
+                             ',,9ff36157b4df732256fe3b151cbf8a6bdcc22969d4d6ceaad588bccbbd5c942f,Tasty,' \
+                             ',,8a332387e40497a972a0ab2099659b49b99be0d00130158f9cb92ecc93ca5b18,Terrible;'
+        self.assertKeyInCache(expected_cache_key)
+

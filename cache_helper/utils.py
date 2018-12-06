@@ -132,7 +132,8 @@ def _plumb_collections(input_item):
                     hashed_list = []
 
                     for k, v in current_item.items():
-                        hashed_list.append((sha256(str(k).encode('utf-8')).hexdigest(), v))
+                        item_cache_key = _get_object_cache_key(k)
+                        hashed_list.append((sha256(item_cache_key.encode('utf-8')).hexdigest(), v))
 
                     hashed_list = sorted(hashed_list, key=lambda t: t[0])
                     remains.append(current_iterator)
@@ -144,7 +145,8 @@ def _plumb_collections(input_item):
                     hashed_list = []
 
                     for item in current_item:
-                        hashed_list.append(sha256(str(item).encode('utf-8')).hexdigest())
+                        item_cache_key = _get_object_cache_key(item)
+                        hashed_list.append(sha256(item_cache_key.encode('utf-8')).hexdigest())
 
                     hashed_list = sorted(hashed_list)
                     remains.append(current_iterator)
