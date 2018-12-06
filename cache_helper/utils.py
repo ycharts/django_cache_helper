@@ -33,17 +33,16 @@ def sanitize_key(key, max_length=250):
     """
     key = ''.join([c for c in key if c not in CONTROL_CHARACTERS])
     key = 'django_cache_helper:' + key
-    key_length = len(key)
     # django memcached backend will, by default, add a prefix. Account for this in max
     # key length. '%s:%s:%s'.format()
     version_length = len(str(getattr(cache, 'version', '')))
     prefix_length = len(settings.CACHE_MIDDLEWARE_KEY_PREFIX)
     # +2 for the colons
     max_length -= (version_length + prefix_length + 2)
-    if key_length > max_length:
-        the_hash = sha256(key.encode('utf-8')).hexdigest()
-        # sha256 always 64 chars.
-        key = key[:max_length - 64] + the_hash
+    # sha256 always produces a hash of length 64
+    key_hash = sha256(key.encode('utf-8')).hexdigest()
+    key = key[:max_length - 64] + key_hash
+
     return key
 
 

@@ -6,13 +6,33 @@ from django.core.cache import cache
 from cache_helper import settings
 from cache_helper.decorators import cached
 from cache_helper.interfaces import CacheHelperCacheable
-from cache_helper.utils import _func_type
+from cache_helper.utils import _func_type, sanitize_key
 from cache_helper.exceptions import CacheKeyCreationError
 
 
 @cached(60*60)
 def foo(a, b):
     return a + b
+
+
+class CacheHelperTestBase(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.apple = Fruit('Apple')
+        cls.cherry = Fruit('Cherry')
+
+        cls.celery = Vegetable('Celery')
+
+        cls.chicken = Meat(name='Chicken', grams_protein=20)
+        cls.steak = Meat(name='Steak', grams_protein=26)
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def assertKeyInCache(self, key):
+        sanitized_key = sanitize_key(key)
+        self.assertTrue(sanitized_key in cache)
 
 
 class Vegetable(object):
@@ -100,12 +120,10 @@ class Meat(CacheHelperCacheable):
         return meat.grams_protein
 
 
-class FuncTypeTest(TestCase):
+class FuncTypeTest(CacheHelperTestBase):
     """
     Test make sure functions catch right type
     """
-    celery = Vegetable('Celery')
-
     def assertFuncType(self, func, tp):
         self.assertEqual(_func_type(func), tp)
 
@@ -122,21 +140,14 @@ class FuncTypeTest(TestCase):
         self.assertFuncType(Vegetable.class_method, 'class_method')
 
 
-class BasicCacheTestCase(TestCase):
+class BasicCacheTestCase(CacheHelperTestBase):
     def test_function_cache(self):
         foo(1, 2)
-        self.assertTrue('django_cache_helper:tests.foo;1,2;' in cache)
+        expected_key = 'tests.foo;1,2;'
+        self.assertKeyInCache(expected_key)
 
 
-class MultipleCallsDiffParamsTestCase(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.apple = Fruit('Apple')
-        cls.cherry = Fruit('Cherry')
-
-    @classmethod
-    def tearDownClass(cls):
-        pass
+class MultipleCallsDiffParamsTestCase(CacheHelperTestBase):
 
     def test_two_models(self):
         # Call first time and place in cache
@@ -150,20 +161,17 @@ class MultipleCallsDiffParamsTestCase(TestCase):
         Fruit.add_sweet_letter('a')
         Fruit.add_sweet_letter('c')
 
-        self.assertTrue("django_cache_helper:tests.Fruit.add_sweet_letter;a;" in cache)
-        self.assertTrue("django_cache_helper:tests.Fruit.add_sweet_letter;c;" in cache)
+        add_sweet_letter_a_key = 'tests.Fruit.add_sweet_letter;a;'
+        add_sweet_letter_c_key = 'tests.Fruit.add_sweet_letter;c;'
+
+        self.assertKeyInCache(add_sweet_letter_a_key)
+        self.assertKeyInCache(add_sweet_letter_c_key)
+
         self.assertEqual(Fruit.add_sweet_letter('a'), 'Fruita')
         self.assertEqual(Fruit.add_sweet_letter('c'), 'Fruitc')
 
 
-class KeyLengthTestCase(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.apple = Fruit('Apple')
-
-    @classmethod
-    def tearDownClass(cls):
-        pass
+class KeyLengthTestCase(CacheHelperTestBase):
 
     def test_keys_are_truncated_beyond_250_chars(self):
         try:
@@ -173,13 +181,7 @@ class KeyLengthTestCase(TestCase):
             self.fail('Keys are not being correctly truncated.')
 
 
-class KeyCreationTestCase(TestCase):
-
-    def setUp(self):
-        self.apple = Fruit('Apple')
-        self.cherry = Fruit('Cherry')
-        self.celery = Vegetable('Celery')
-
+class KeyCreationTestCase(CacheHelperTestBase):
     def tearDown(self):
         settings.MAX_DEPTH = 2
 
@@ -225,31 +227,35 @@ class KeyCreationTestCase(TestCase):
         Surface level objects are serialized correctly with default settings...
         """
         self.apple.take_then_give_back(self.cherry)
-        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,MyNameIsCherry;' in cache)
+        apple_take_cherry_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,MyNameIsCherry;'
+        self.assertKeyInCache(apple_take_cherry_key)
 
     def test_dict_args_properly_convert_to_string(self):
         self.apple.take_then_give_back({1: self.cherry})
-        hashed_key = sha256(str(1).encode('utf-8')).hexdigest()
-        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,,{0},MyNameIsCherry;'.format(hashed_key) in cache)
+        hashed_dict_key = sha256(str(1).encode('utf-8')).hexdigest()
+        expected_cache_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,,{0},MyNameIsCherry;'.format(hashed_dict_key)
+        self.assertKeyInCache(expected_cache_key)
 
     def test_dict_args_keep_the_same_order_when_convert_to_string(self):
         dict_arg = {1: self.cherry, 'string': 'ay carambe'}
         self.apple.take_then_give_back(dict_arg)
-
-        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,,'
-                        '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,aycarambe,,'
-                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,MyNameIsCherry;' in cache)
+        expected_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,,' \
+                       '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,aycarambe,,' \
+                       '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,MyNameIsCherry;'
+        self.assertKeyInCache(expected_key)
 
     def test_set_args_properly_maintain_order_and_convert_to_string(self):
-        self.apple.take_then_give_back({1,'vegetable', self.cherry})
-        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,'
-                        '4715b734085d8d9c9981d91c6d5cff398c75caf44074851baa94f2de24fba4d7,'
-                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c018a26f860f326e'
-                        '47b45ae7eee0d2dd530dcbaaca886cd1733d9e53dcd001c49be' in cache)
+        self.apple.take_then_give_back({1, 'vegetable', self.cherry})
+        expected_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,' \
+                       '4715b734085d8d9c9981d91c6d5cff398c75caf44074851baa94f2de24fba4d7,' \
+                       '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,' \
+                       'f8201a5264b6b89b4d92c5bc46aa2e5c3e9610e8fc9ef200df1a39c7f10e7af6;'
+        self.assertKeyInCache(expected_key)
 
     def test_list_args_properly_convert_to_string(self):
         self.apple.take_then_give_back([self.cherry])
-        self.assertTrue('django_cache_helper:tests.Fruit.take_then_give_back;MyNameIsApple,,MyNameIsCherry;' in cache)
+        expected_cache_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,MyNameIsCherry;'
+        self.assertKeyInCache(expected_cache_key)
 
     def test_raises_depth_error(self):
         settings.MAX_DEPTH = 0
@@ -257,19 +263,9 @@ class KeyCreationTestCase(TestCase):
             self.apple.take_then_give_back([self.cherry])
 
 
-class CacheableTestCase(TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        cls.chicken = Meat(name='Chicken', grams_protein=20)
-        cls.steak = Meat(name='Steak', grams_protein=26)
-
-    @classmethod
-    def tearDownClass(cls):
-        pass
+class CacheableTestCase(CacheHelperTestBase):
 
     def test_cacheable_key_creation(self):
         Meat.get_grams_protein(self.chicken)
-        cache_key = Meat.get_grams_protein.get_cache_key(self.chicken)
-        self.assertTrue(cache_key in cache)
-
+        grams_protein_chicken_key = 'tests.Meat.get_grams_protein;Chicken:20;'
+        self.assertKeyInCache(grams_protein_chicken_key)
