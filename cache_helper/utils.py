@@ -11,7 +11,7 @@ from cache_helper.interfaces import CacheHelperCacheable
 CONTROL_CHARACTERS = set([chr(i) for i in range(0, 33)])
 CONTROL_CHARACTERS.add(chr(127))
 
-DJANGO_CACHE_HELPER_PREFIX = 'cache_helper_prefix'
+DJANGO_CACHE_HELPER_PREFIX = 'django_cache_helper'
 
 
 def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
