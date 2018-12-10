@@ -18,12 +18,10 @@ def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     if func_type in ['method', 'function']:
         args_string = _sanitize_args(*func_args, **func_kwargs)
     elif func_type == 'class_method':
-        # In this case, func_args is the tuple (args, kwargs) so we get the
-        # args by getting the zero index element. Next, because the func_type
-        # is a class_method, the first argument will be the class used followed by
-        # the actual arguments. We are not interested in the class, only method arguments,
-        # which is why we slice from index 1
-        args_string = _sanitize_args(func_args[0][1:], **func_kwargs)
+        # In this case, since we are dealing with a class method, the first arg to the function
+        # will be the class. Since the name of the class and function is already built in to the
+        # cache key, we can bypass the class variable and instead slice from the first index.
+        args_string = _sanitize_args(*func_args[1:], **func_kwargs)
     key = '{func_name}{args_string}'.format(func_name=func_name, args_string=args_string)
     return key
 
@@ -48,7 +46,7 @@ def sanitize_key(key, max_length=250):
     return key
 
 
-def _sanitize_args(args=[], kwargs={}):
+def _sanitize_args(*args, **kwargs):
     """
     Creates unicode key from all kwargs/args
         -Note: comma separate args in order to prevent foo(1,2), foo(12, None) corner-case collisions...
