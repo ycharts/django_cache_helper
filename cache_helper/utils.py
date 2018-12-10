@@ -59,7 +59,7 @@ def _sanitize_args(args=[], kwargs={}):
     return key.format(args_key=args_key, kwargs_key=kwargs_key)
 
 
-def _func_type(func):
+def get_function_type(func):
     """
     Gets the type of the given function
     """
@@ -81,8 +81,8 @@ def _func_type(func):
     return None
 
 
-def _func_info(func):
-    func_type = _func_type(func)
+def get_function_name(func):
+    func_type = get_function_type(func)
 
     if func_type in ['method', 'class_method', 'function']:
         name = '{func_module}.{qualified_name}'\

@@ -8,7 +8,7 @@ from django.core.cache import cache
 from cache_helper import settings
 from cache_helper.decorators import cached
 from cache_helper.interfaces import CacheHelperCacheable
-from cache_helper.utils import _func_type, sanitize_key
+from cache_helper.utils import get_function_type, sanitize_key
 from cache_helper.exceptions import CacheKeyCreationError
 
 
@@ -143,7 +143,7 @@ class FuncTypeTest(CacheHelperTestBase):
     Test make sure functions catch right type
     """
     def assertFuncType(self, func, tp):
-        self.assertEqual(_func_type(func), tp)
+        self.assertEqual(get_function_type(func), tp)
 
     def test_module_func(self):
         self.assertFuncType(foo, 'function')
@@ -293,7 +293,7 @@ class CacheableTestCase(CacheHelperTestBase):
         self.assertKeyInCache(expected_cache_key)
 
     @patch('tests.Meat.get_grams_protein', return_value=20)
-    @patch('cache_helper.utils._func_type', return_value='function')
+    @patch('cache_helper.utils.get_function_type', return_value='function')
     def test_decorator_only_calls_function_once_if_value_cached(self, _, mock_get_grams_protein):
         """
         If decorated function was already called with same args, decorator won't call wrapped function twice
@@ -309,7 +309,7 @@ class CacheableTestCase(CacheHelperTestBase):
         self.assertEqual(mock_get_grams_protein.call_count, 1)
 
     @patch('tests.Meat.get_grams_protein', return_value=20)
-    @patch('cache_helper.utils._func_type', return_value='function')
+    @patch('cache_helper.utils.get_function_type', return_value='function')
     def test_decorator_only_calls_function_twice_when_supplied_different_args(self, _, mock_get_grams_protein):
         """
         Decorator calls function twice when supplied with different args

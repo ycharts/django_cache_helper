@@ -10,25 +10,7 @@ from cache_helper import utils
 
 def cached(timeout):
     def _cached(func):
-        func_type = utils._func_type(func)
-
-        def _get_cache_key(func_name, *args, **kwargs):
-            """
-            Private internal function used to get the cache key for a function given its name, type,
-            and what args and kwargs were supplied to it.
-            """
-            function_cache_key = utils.get_function_cache_key(func_name, func_type, args, kwargs)
-            return utils.sanitize_key(function_cache_key)
-
-        def get_cache_key(*args, **kwargs):
-            """
-            Gets the cache key that would be used if the given args and kwargs were supplied to decorated
-            function. For example, calling foo.get_cache_key('hello', 5) would not call foo - it would just
-            return the cache key that would be used if you were to call foo with the same args/kwargs.
-            """
-            func_name = utils._func_info(func)
-            cache_key = _get_cache_key(func_name, args, kwargs)
-            return cache_key
+        func_type = utils.get_function_type(func)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -60,6 +42,24 @@ def cached(timeout):
             """
             cache_key = get_cache_key(*args, **kwargs)
             cache.delete(cache_key)
+
+        def get_cache_key(*args, **kwargs):
+            """
+            Gets the cache key that would be used if the given args and kwargs were supplied to decorated
+            function. For example, calling foo.get_cache_key('hello', 5) would not call foo - it would just
+            return the cache key that would be used if you were to call foo with the same args/kwargs.
+            """
+            func_name = utils.get_function_name(func)
+            cache_key = _get_cache_key(func_name, args, kwargs)
+            return cache_key
+
+        def _get_cache_key(func_name, *args, **kwargs):
+            """
+            Private internal function used to get the cache key for a function given its name, type,
+            and what args and kwargs were supplied to it.
+            """
+            function_cache_key = utils.get_function_cache_key(func_name, func_type, args, kwargs)
+            return utils.sanitize_key(function_cache_key)
 
         wrapper.get_cache_key = get_cache_key
         wrapper.invalidate = invalidate
