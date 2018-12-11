@@ -170,7 +170,13 @@ class MultipleCallsDiffParamsTestCase(CacheHelperTestBase):
     def test_two_models(self):
         # Call first time and place in cache
         apple_val = self.apple.fun_math(10, 10)
+        expected_apple_cache_key = 'tests.Fruit.fun_math;MyNameIsApple,10,10;'
+
         cherry_val = self.cherry.fun_math(15, 10)
+        expected_cherry_cache_key = 'tests.Fruit.fun_math;MyNameIsCherry,15,10;'
+
+        self.assertKeyInCache(expected_apple_cache_key)
+        self.assertKeyInCache(expected_cherry_cache_key)
 
         self.assertEqual(self.apple.fun_math(10, 10), apple_val)
         self.assertEqual(self.cherry.fun_math(15, 10), cherry_val)
