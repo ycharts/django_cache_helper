@@ -9,7 +9,7 @@ from cache_helper import settings
 from cache_helper.decorators import cached
 from cache_helper.interfaces import CacheHelperCacheable
 from cache_helper.utils import get_function_type, get_final_cache_key
-from cache_helper.exceptions import CacheKeyCreationError
+from cache_helper.exceptions import CacheKeyCreationError, CacheHelperFunctionError
 
 
 @cached(60*60)
@@ -361,3 +361,25 @@ class CacheableTestCase(CacheHelperTestBase):
         Meat.get_grams_protein(meat=self.chicken)
         expected_cache_key = 'tests.Meat.get_grams_protein;;,meat,Chicken:20'
         self.assertKeyInCache(expected_cache_key)
+
+
+class CacheHelperExceptionsTestCase(CacheHelperTestBase):
+    @patch('cache_helper.utils.get_function_type', return_value=None)
+    def test_no_func_type_raises_exception(self, _):
+        """
+        CacheHelperFunctionError should be raised when issue determining function type
+        """
+        with self.assertRaises(CacheHelperFunctionError):
+            @cached(60*5)
+            def test_function():
+                pass
+
+    @patch('cache_helper.utils.get_function_name', return_value=None)
+    def test_no_func_name_raises_exception(self, _):
+        """
+        CacheHelperFunctionError should be raised when issue determining function name
+        """
+        with self.assertRaises(CacheHelperFunctionError):
+            @cached(60*5)
+            def test_function():
+                pass
