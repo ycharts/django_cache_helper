@@ -5,13 +5,20 @@ except ImportError:
 
 from django.core.cache import cache
 from django.utils.functional import wraps
+
 from cache_helper import utils
+from cache_helper.exceptions import CacheHelperFunctionError
 
 
 def cached(timeout):
     def _cached(func):
         func_type = utils.get_function_type(func)
+        if func_type is None:
+            raise CacheHelperFunctionError('Error determining function type of {func}'.format(func=func))
+
         func_name = utils.get_function_name(func)
+        if func_name is None:
+            raise CacheHelperFunctionError('Error determining function name of {func}'.format(func=func))
 
         @wraps(func)
         def wrapper(*args, **kwargs):

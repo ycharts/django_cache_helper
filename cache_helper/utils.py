@@ -70,7 +70,8 @@ def get_function_name(func):
         name = '{func_module}.{qualified_name}'\
             .format(func_module=func.__module__, qualified_name=func.__qualname__)
         return name
-    return ''
+
+    return None
 
 
 def _plumb_collections(input_item):
