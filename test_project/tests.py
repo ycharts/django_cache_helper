@@ -17,29 +17,6 @@ def foo(a, b):
     return a + b
 
 
-class CacheHelperTestBase(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.apple = Fruit('Apple')
-        cls.cherry = Fruit('Cherry')
-
-        cls.celery = Vegetable('Celery')
-
-        cls.chicken = Meat(name='Chicken', grams_protein=20)
-        cls.steak = Meat(name='Steak', grams_protein=26)
-
-    @classmethod
-    def tearDownClass(cls):
-        pass
-
-    def tearDown(self):
-        cache.clear()
-
-    def assertKeyInCache(self, key):
-        finalized_key = get_final_cache_key(key)
-        self.assertTrue(finalized_key in cache)
-
-
 class Vegetable(object):
     def __init__(self, name):
         self.name = name
@@ -136,6 +113,29 @@ class Meat(CacheHelperCacheable):
     @cached(60*60)
     def get_protein_sum(meats):
         return sum(meat.grams_protein for meat in meats)
+
+
+class CacheHelperTestBase(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.apple = Fruit('Apple')
+        cls.cherry = Fruit('Cherry')
+
+        cls.celery = Vegetable('Celery')
+
+        cls.chicken = Meat(name='Chicken', grams_protein=20)
+        cls.steak = Meat(name='Steak', grams_protein=26)
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def tearDown(self):
+        cache.clear()
+
+    def assertKeyInCache(self, key):
+        finalized_key = get_final_cache_key(key)
+        self.assertTrue(finalized_key in cache)
 
 
 class FuncTypeTest(CacheHelperTestBase):
