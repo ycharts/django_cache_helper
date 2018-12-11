@@ -1,15 +1,9 @@
 from hashlib import sha256
 import inspect
 
-from django.core.cache import cache
-
 from cache_helper import settings
 from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
-
-# List of Control Characters not useable by memcached
-CONTROL_CHARACTERS = set([chr(i) for i in range(0, 33)])
-CONTROL_CHARACTERS.add(chr(127))
 
 DJANGO_CACHE_HELPER_PREFIX = 'django_cache_helper'
 
@@ -26,24 +20,14 @@ def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     return key
 
 
-def sanitize_key(key, max_length=250):
+def get_final_cache_key(key):
     """
-    Truncates key to keep it under memcached char limit.  Replaces with hash.
-    Remove control characters b/c of memcached restriction on control chars.
+    Given the intermediate key produced by a function call along with its args + kwargs,
+    prepends the DJANGO_CACHE_HELPER_PREFIX and then performs a sha256 hash, and returns the result
     """
-    key = ''.join([c for c in key if c not in CONTROL_CHARACTERS])
     key = '{cache_helper_prefix}:{key}'.format(cache_helper_prefix=DJANGO_CACHE_HELPER_PREFIX, key=key)
-    # django memcached backend will, by default, add a prefix. Account for this in max
-    # key length. '%s:%s:%s'.format()
-    version_length = len(str(getattr(cache, 'version', '')))
-    prefix_length = len(settings.CACHE_MIDDLEWARE_KEY_PREFIX)
-    # +2 for the colons
-    max_length -= (version_length + prefix_length + 2)
-    # sha256 always produces a hash of length 64
     key_hash = sha256(key.encode('utf-8')).hexdigest()
-    key = key[:max_length - 64] + key_hash
-
-    return key
+    return key_hash
 
 
 def _sanitize_args(*args, **kwargs):

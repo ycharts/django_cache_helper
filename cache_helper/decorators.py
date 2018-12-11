@@ -51,7 +51,7 @@ def cached(timeout):
             return the cache key that would be used if you were to call foo with the same args/kwargs.
             """
             function_cache_key = utils.get_function_cache_key(func_name, func_type, args, kwargs)
-            return utils.sanitize_key(function_cache_key)
+            return utils.get_final_cache_key(function_cache_key)
 
         wrapper.get_cache_key = get_cache_key
         wrapper.invalidate = invalidate

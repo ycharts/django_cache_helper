@@ -8,7 +8,7 @@ from django.core.cache import cache
 from cache_helper import settings
 from cache_helper.decorators import cached
 from cache_helper.interfaces import CacheHelperCacheable
-from cache_helper.utils import get_function_type, sanitize_key
+from cache_helper.utils import get_function_type, get_final_cache_key
 from cache_helper.exceptions import CacheKeyCreationError
 
 
@@ -36,8 +36,8 @@ class CacheHelperTestBase(TestCase):
         cache.clear()
 
     def assertKeyInCache(self, key):
-        sanitized_key = sanitize_key(key)
-        self.assertTrue(sanitized_key in cache)
+        finalized_key = get_final_cache_key(key)
+        self.assertTrue(finalized_key in cache)
 
 
 class Vegetable(object):
@@ -258,7 +258,7 @@ class KeyCreationTestCase(CacheHelperTestBase):
         dict_arg = {1: self.cherry, 'string': 'ay carambe'}
         self.apple.take_then_give_back(dict_arg)
         expected_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,,' \
-                       '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,aycarambe,,' \
+                       '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,ay carambe,,' \
                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,MyNameIsCherry;'
         self.assertKeyInCache(expected_key)
 
