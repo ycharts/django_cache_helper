@@ -17,6 +17,11 @@ def foo(a, b):
     return a + b
 
 
+@cached(5*60)
+def return_string(s):
+    return s
+
+
 class Vegetable(object):
     def __init__(self, name):
         self.name = name
@@ -133,7 +138,10 @@ class CacheHelperTestBase(TestCase):
     def tearDown(self):
         cache.clear()
 
-    def assertKeyInCache(self, key):
+    def assertExpectedKeyInCache(self, key):
+        """
+        Tests given key is in cache, making sure to get the hashed version of key first
+        """
         finalized_key = get_final_cache_key(key)
         self.assertTrue(finalized_key in cache)
 
@@ -158,13 +166,6 @@ class FuncTypeTest(CacheHelperTestBase):
         self.assertFuncType(Vegetable.class_method, 'class_method')
 
 
-class BasicCacheTestCase(CacheHelperTestBase):
-    def test_function_cache(self):
-        foo(1, 2)
-        expected_key = 'tests.foo;1,2;'
-        self.assertKeyInCache(expected_key)
-
-
 class MultipleCallsDiffParamsTestCase(CacheHelperTestBase):
 
     def test_two_models(self):
@@ -175,8 +176,8 @@ class MultipleCallsDiffParamsTestCase(CacheHelperTestBase):
         cherry_val = self.cherry.fun_math(15, 10)
         expected_cherry_cache_key = 'tests.Fruit.fun_math;MyNameIsCherry,15,10;'
 
-        self.assertKeyInCache(expected_apple_cache_key)
-        self.assertKeyInCache(expected_cherry_cache_key)
+        self.assertExpectedKeyInCache(expected_apple_cache_key)
+        self.assertExpectedKeyInCache(expected_cherry_cache_key)
 
         self.assertEqual(self.apple.fun_math(10, 10), apple_val)
         self.assertEqual(self.cherry.fun_math(15, 10), cherry_val)
@@ -188,16 +189,76 @@ class MultipleCallsDiffParamsTestCase(CacheHelperTestBase):
         add_sweet_letter_a_key = 'tests.Fruit.add_sweet_letter;a;'
         add_sweet_letter_c_key = 'tests.Fruit.add_sweet_letter;c;'
 
-        self.assertKeyInCache(add_sweet_letter_a_key)
-        self.assertKeyInCache(add_sweet_letter_c_key)
+        self.assertExpectedKeyInCache(add_sweet_letter_a_key)
+        self.assertExpectedKeyInCache(add_sweet_letter_c_key)
 
         self.assertEqual(Fruit.add_sweet_letter('a'), 'Fruita')
         self.assertEqual(Fruit.add_sweet_letter('c'), 'Fruitc')
 
 
+class KeyInvalidationTestCase(CacheHelperTestBase):
+    def test_function_invalidate_removes_key_from_cache(self):
+        foo(1, 2)
+        final_cache_key = foo.get_cache_key(1, 2)
+        self.assertTrue(final_cache_key in cache)
+        foo.invalidate(1, 2)
+        self.assertFalse(final_cache_key in cache)
+
+    def test_class_method_invalidate_removes_key_from_cache(self):
+        Vegetable.add_sweet_letter('a')
+        # Note the need to pass in the class, as it's a class method that is being decorated
+        final_cache_key = Vegetable.add_sweet_letter.get_cache_key(Vegetable, 'a')
+        self.assertTrue(final_cache_key in cache)
+        Vegetable.add_sweet_letter.invalidate(Vegetable, 'a')
+        self.assertFalse(final_cache_key in cache)
+
+    def test_static_method_invalidate_removes_key_from_cache(self):
+        Vegetable.static_method(self.celery)
+        final_cache_key = Vegetable.static_method.get_cache_key(self.celery)
+        self.assertTrue(final_cache_key in cache)
+        Vegetable.static_method.invalidate(self.celery)
+        self.assertFalse(final_cache_key in cache)
+
+
 class KeyCreationTestCase(CacheHelperTestBase):
     def tearDown(self):
         settings.MAX_DEPTH = 2
+
+    def test_unusual_character_key_creation(self):
+        return_string('āęìøü')
+        strange_chars_cache_key = return_string.get_cache_key('āęìøü')
+        self.assertTrue(strange_chars_cache_key in cache)
+
+        return_string('aeiou')
+        cache_key = return_string.get_cache_key('aeiou')
+        self.assertTrue(cache_key in cache)
+
+        self.assertNotEqual(strange_chars_cache_key, cache_key)
+
+    def test_function_get_cache_key_returns_correct_key(self):
+        """
+        Calling get_cache_key on decorated function should return same key used when calling decorated function
+        """
+        foo(1, 2)
+        final_cache_key = foo.get_cache_key(1, 2)
+        self.assertTrue(final_cache_key in cache)
+
+    def test_static_function_get_cache_key_returns_correct_key(self):
+        """
+        Calling get_cache_key on decorated static method should return same key used when calling decorated function
+        """
+        Vegetable.static_method(self.celery)
+        final_cache_key = Vegetable.static_method.get_cache_key(self.celery)
+        self.assertTrue(final_cache_key in cache)
+
+    def test_class_method_get_cache_key_returns_correct_key(self):
+        """
+        Calling get_cache_key on decorated class method should return same key used when calling decorated function
+        """
+        Vegetable.add_sweet_letter('a')
+        # Note the need to pass in the class, as it's a class method that is being decorated
+        final_cache_key = Vegetable.add_sweet_letter.get_cache_key(Vegetable, 'a')
+        self.assertTrue(final_cache_key in cache)
 
     def test_same_method_name_different_class(self):
         """
@@ -242,13 +303,13 @@ class KeyCreationTestCase(CacheHelperTestBase):
         """
         self.apple.take_then_give_back(self.cherry)
         apple_take_cherry_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,MyNameIsCherry;'
-        self.assertKeyInCache(apple_take_cherry_key)
+        self.assertExpectedKeyInCache(apple_take_cherry_key)
 
     def test_dict_args_properly_convert_to_string(self):
         self.apple.take_then_give_back({1: self.cherry})
         hashed_dict_key = sha256(str(1).encode('utf-8')).hexdigest()
         expected_cache_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,,{0},MyNameIsCherry;'.format(hashed_dict_key)
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
     def test_dict_args_keep_the_same_order_when_convert_to_string(self):
         dict_arg = {1: self.cherry, 'string': 'ay carambe'}
@@ -256,7 +317,7 @@ class KeyCreationTestCase(CacheHelperTestBase):
         expected_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,,' \
                        '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,ay carambe,,' \
                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,MyNameIsCherry;'
-        self.assertKeyInCache(expected_key)
+        self.assertExpectedKeyInCache(expected_key)
 
     def test_set_args_properly_maintain_order_and_convert_to_string(self):
         self.apple.take_then_give_back({1, 'vegetable', self.cherry})
@@ -264,12 +325,12 @@ class KeyCreationTestCase(CacheHelperTestBase):
                        '4715b734085d8d9c9981d91c6d5cff398c75caf44074851baa94f2de24fba4d7,' \
                        '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,' \
                        'f8201a5264b6b89b4d92c5bc46aa2e5c3e9610e8fc9ef200df1a39c7f10e7af6;'
-        self.assertKeyInCache(expected_key)
+        self.assertExpectedKeyInCache(expected_key)
 
     def test_list_args_properly_convert_to_string(self):
         self.apple.take_then_give_back([self.cherry])
         expected_cache_key = 'tests.Fruit.take_then_give_back;MyNameIsApple,,MyNameIsCherry;'
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
     def test_raises_depth_error(self):
         settings.MAX_DEPTH = 0
@@ -286,7 +347,7 @@ class CacheableTestCase(CacheHelperTestBase):
         Meat.get_grams_protein(self.chicken)
         expected_cache_key = 'tests.Meat.get_grams_protein;Chicken:20;'
         self.assertTrue(self.chicken.get_cache_helper_key() in expected_cache_key)
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
     @patch('tests.Meat.get_grams_protein', return_value=20)
     @patch('cache_helper.utils.get_function_type', return_value='function')
@@ -324,7 +385,7 @@ class CacheableTestCase(CacheHelperTestBase):
         """
         Meat.get_tastier_option(self.chicken, self.celery)
         expected_cache_key = 'tests.Meat.get_tastier_option;Chicken:20,MyNameIsCelery;'
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
     def test_key_for_list_of_cacheable_objects(self):
         """
@@ -332,7 +393,7 @@ class CacheableTestCase(CacheHelperTestBase):
         """
         Meat.get_protein_sum([self.chicken, self.steak])
         expected_cache_key = 'tests.Meat.get_protein_sum;,Chicken:20,Steak:26;'
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
     def test_key_for_set_of_cacheable_objects(self):
         """
@@ -342,7 +403,7 @@ class CacheableTestCase(CacheHelperTestBase):
         expected_cache_key = 'tests.Meat.get_protein_sum;,' \
                              '6dd472107034f41f27f301ddbcc97ba4bc0d54945e759d170268aa1091c436fe,' \
                              '9ff36157b4df732256fe3b151cbf8a6bdcc22969d4d6ceaad588bccbbd5c942f;'
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
     def test_key_for_dict_of_cacheable_objects(self):
         """
@@ -352,7 +413,7 @@ class CacheableTestCase(CacheHelperTestBase):
         expected_cache_key = 'tests.Meat.get_tastier_option;' \
                              ',,9ff36157b4df732256fe3b151cbf8a6bdcc22969d4d6ceaad588bccbbd5c942f,Tasty,' \
                              ',,8a332387e40497a972a0ab2099659b49b99be0d00130158f9cb92ecc93ca5b18,Terrible;'
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
     def test_key_for_function_with_cache_helper_cacheable_object_as_kwarg(self):
         """
@@ -360,7 +421,7 @@ class CacheableTestCase(CacheHelperTestBase):
         """
         Meat.get_grams_protein(meat=self.chicken)
         expected_cache_key = 'tests.Meat.get_grams_protein;;,meat,Chicken:20'
-        self.assertKeyInCache(expected_cache_key)
+        self.assertExpectedKeyInCache(expected_cache_key)
 
 
 class CacheHelperExceptionsTestCase(CacheHelperTestBase):

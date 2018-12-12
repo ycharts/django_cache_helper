@@ -53,7 +53,9 @@ def get_function_type(func):
         else:
             return 'method'
 
-    # Covers case when a class method is decorated
+    # Covers case when a method is decorated
+    if 'self' in inspect.getargspec(func).args:
+        return 'method'
     if 'cls' in inspect.getargspec(func).args:
         return 'class_method'
 

@@ -3,6 +3,7 @@ try:
 except ImportError:
     from cache_helper.exceptions import CacheHelperException as CacheSetError
 
+
 from django.core.cache import cache
 from django.utils.functional import wraps
 
@@ -11,6 +12,7 @@ from cache_helper.exceptions import CacheHelperFunctionError
 
 
 def cached(timeout):
+
     def _cached(func):
         func_type = utils.get_function_type(func)
         if func_type is None:
@@ -62,6 +64,7 @@ def cached(timeout):
 
         wrapper.get_cache_key = get_cache_key
         wrapper.invalidate = invalidate
+
         return wrapper
 
     return _cached
