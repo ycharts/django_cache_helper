@@ -5,8 +5,6 @@ from cache_helper import settings
 from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
-DJANGO_CACHE_HELPER_PREFIX = 'django_cache_helper'
-
 
 def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     if func_type in ['method', 'function']:
@@ -23,9 +21,8 @@ def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
 def get_final_cache_key(key):
     """
     Given the intermediate key produced by a function call along with its args + kwargs,
-    prepends the DJANGO_CACHE_HELPER_PREFIX and then performs a sha256 hash, and returns the result
+    performs a sha256 hash on the utf-8 encoded version of the key, and returns the result
     """
-    key = '{cache_helper_prefix}:{key}'.format(cache_helper_prefix=DJANGO_CACHE_HELPER_PREFIX, key=key)
     key_hash = sha256(key.encode('utf-8')).hexdigest()
     return key_hash
 
