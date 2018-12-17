@@ -43,16 +43,6 @@ def cached(timeout):
 
             return value
 
-        def invalidate(*args, **kwargs):
-            """
-            Remove value from cache using same args/kwargs to the wrapped function originally supplied.
-            For example, if you initially made a function call foo('hello', 5) which resulted
-            in some value being stored inside the cache, you would call foo.invalidate('hello', 5)
-            to remove that value.
-            """
-            cache_key = get_cache_key(*args, **kwargs)
-            cache.delete(cache_key)
-
         def get_cache_key(*args, **kwargs):
             """
             Gets the cache key that would be used if the given args and kwargs were supplied to decorated
@@ -62,9 +52,5 @@ def cached(timeout):
             function_cache_key = utils.get_function_cache_key(func_name, func_type, args, kwargs)
             return utils.get_final_cache_key(function_cache_key)
 
-        wrapper.get_cache_key = get_cache_key
-        wrapper.invalidate = invalidate
-
         return wrapper
-
     return _cached
