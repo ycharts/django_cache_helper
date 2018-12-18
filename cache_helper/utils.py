@@ -6,7 +6,7 @@ from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
 
-def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
+def get_function_cache_key(func_type, func_name, func_args, func_kwargs):
     if func_type in ['method', 'function']:
         args_string = _sanitize_args(*func_args, **func_kwargs)
     elif func_type == 'class_method':
@@ -18,12 +18,12 @@ def get_function_cache_key(func_name, func_type, func_args, func_kwargs):
     return key
 
 
-def get_final_cache_key(key):
+def get_hashed_cache_key(key):
     """
     Given the intermediate key produced by a function call along with its args + kwargs,
     performs a sha256 hash on the utf-8 encoded version of the key, and returns the result
     """
-    key_hash = sha256(key.encode('utf-8')).hexdigest()
+    key_hash = sha256(key.encode('utf-8', errors='ignore')).hexdigest()
     return key_hash
 
 
@@ -42,15 +42,6 @@ def get_function_type(func):
     """
     Gets the type of the given function
     """
-    if inspect.ismethod(func):
-        # If the self attribute of the function is a class, it must be a class method
-        # Otherwise, it will be an instance method of some class, so just a regular method
-        if inspect.isclass(func.__self__):
-            return 'class_method'
-        else:
-            return 'method'
-
-    # Covers case when a method is decorated
     if 'self' in inspect.getargspec(func).args:
         return 'method'
     if 'cls' in inspect.getargspec(func).args:

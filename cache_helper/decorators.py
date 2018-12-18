@@ -24,7 +24,8 @@ def cached(timeout):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_key = get_cache_key(*args, **kwargs)
+            function_cache_key = utils.get_function_cache_key(func_type, func_name, args, kwargs)
+            cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
                 value = cache.get(cache_key)
@@ -42,15 +43,6 @@ def cached(timeout):
                     pass
 
             return value
-
-        def get_cache_key(*args, **kwargs):
-            """
-            Gets the cache key that would be used if the given args and kwargs were supplied to decorated
-            function. For example, calling foo.get_cache_key('hello', 5) would not call foo - it would just
-            return the cache key that would be used if you were to call foo with the same args/kwargs.
-            """
-            function_cache_key = utils.get_function_cache_key(func_name, func_type, args, kwargs)
-            return utils.get_final_cache_key(function_cache_key)
 
         return wrapper
     return _cached
