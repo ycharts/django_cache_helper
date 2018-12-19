@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-cache-helper',
-    version="0.1",
+    version="0.3.0",
     description='Helps cache stuff',
     author='James Bianco',
     author_email='jsbianco33@gmail.com',
