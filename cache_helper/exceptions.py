@@ -1,5 +1,10 @@
 class CacheHelperException(Exception):
-	pass
+    pass
+
 
 class CacheKeyCreationError(CacheHelperException):
-	pass
+    pass
+
+
+class CacheHelperFunctionError(CacheHelperException):
+    pass

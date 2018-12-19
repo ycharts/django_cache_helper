@@ -3,25 +3,32 @@ try:
 except ImportError:
     from cache_helper.exceptions import CacheHelperException as CacheSetError
 
+
 from django.core.cache import cache
 from django.utils.functional import wraps
+
 from cache_helper import utils
+from cache_helper.exceptions import CacheHelperFunctionError
 
 
 def cached(timeout):
-    def get_key(*args, **kwargs):
-        return utils.sanitize_key(utils._cache_key(*args, **kwargs))
 
-    def _cached(func, *args):
-        func_type = utils._func_type(func)
+    def _cached(func):
+        func_type = utils.get_function_type(func)
+        if func_type is None:
+            raise CacheHelperFunctionError('Error determining function type of {func}'.format(func=func))
+
+        func_name = utils.get_function_name(func)
+        if func_name is None:
+            raise CacheHelperFunctionError('Error determining function name of {func}'.format(func=func))
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            name = utils._func_info(func, args)
-            key = get_key(name, func_type, args, kwargs)
+            function_cache_key = utils.get_function_cache_key(func_type, func_name, args, kwargs)
+            cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
-                value = cache.get(key)
+                value = cache.get(cache_key)
             except Exception:
                 value = None
 
@@ -31,16 +38,11 @@ def cached(timeout):
                 # But if it fails on an error from the underlying
                 # cache system, handle it.
                 try:
-                    cache.set(key, value, timeout)
+                    cache.set(cache_key, value, timeout)
                 except CacheSetError:
                     pass
 
             return value
 
-        def invalidate(*args, **kwargs):
-            name = utils._func_info(func, args)
-            key = get_key(name, func_type, args, kwargs)
-            cache.delete(key)
-        wrapper.invalidate = invalidate
         return wrapper
     return _cached
