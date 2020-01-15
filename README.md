@@ -18,3 +18,10 @@ def foo(bar):
 def foo(self):
 	return self.id + 2
 ```
+
+
+### Support
+
+Python: 3.4, 3.5, 3.6, 3.7
+
+Django: 1.7, 1.8, 1.9, 1.10, 1.11, 2.0, 2.1, 2.2, 3.0 
