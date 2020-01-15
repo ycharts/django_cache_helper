@@ -3,16 +3,27 @@ language: python
 python:
     - 3.4
     - 3.5
+    - 3.6
 env:
     - DJANGO_VERSION=1.7.11
     - DJANGO_VERSION=1.8.19
     - DJANGO_VERSION=1.9.13
     - DJANGO_VERSION=1.10.8
-    - DJANGO_VERSION=1.11.17
-    - DJANGO_VERSION=2.0.10
-    - DJANGO_VERSION=2.1.4
+    - DJANGO_VERSION=1.11.27
+    - DJANGO_VERSION=2.0.13
+    - DJANGO_VERSION=2.1.14
+    - DJANGO_VERSION=2.2.9
+jobs:
+    exclude:
+        - python: 3.4
+          env: DJANGO_VERSION=2.1.14
+        - python: 3.5
+          env: DJANGO_VERSION=1.7.11
 install:
     - pip install -r requirements.txt
+    # Install the version of Django we are testing for and override
+    # whatever version of Django that was in requirements.txt
+    - pip install -q Django==$DJANGO_VERSION
     # Install dev requirements for testing
     - pip install -r dev_requirements.txt
     # Install cache helper
