@@ -42,9 +42,9 @@ def get_function_type(func):
     """
     Gets the type of the given function
     """
-    if 'self' in inspect.getargspec(func).args:
+    if 'self' in inspect.getfullargspec(func).args:
         return 'method'
-    if 'cls' in inspect.getargspec(func).args:
+    if 'cls' in inspect.getfullargspec(func).args:
         return 'class_method'
 
     if inspect.isfunction(func):
