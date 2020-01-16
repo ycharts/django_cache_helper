@@ -27,6 +27,3 @@ def foo(self):
 ```
 
 
-### Support
-
-
