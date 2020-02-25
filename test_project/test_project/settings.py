@@ -11,7 +11,3 @@ SECRET_KEY = '-&_@yi2)i^algv-6vjt(+mi*(s9rk7r4v!s2c2s+-$131xq#_t'
 MIDDLEWARE_CLASSES = ()
 
 INSTALLED_APPS = ()
-
-TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
-
-NOSE_ARGS = ['--verbosity=2', '--nocapture']

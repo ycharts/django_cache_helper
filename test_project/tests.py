@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../django_cache_helper')
+
 from hashlib import sha256
 
 from unittest.mock import patch
@@ -74,13 +77,6 @@ class Fruit(object):
     def take_then_give_back(self, a):
         return a
 
-    @property
-    @cached(60*60)
-    def is_green(self):
-        if self.name == 'Apple':
-            return True
-        return False
-
     @classmethod
     @cached(60*60)
     def add_sweet_letter(cls, a):
@@ -143,6 +139,13 @@ class CacheHelperTestBase(TestCase):
         """
         finalized_key = get_hashed_cache_key(key)
         self.assertTrue(finalized_key in cache)
+
+    def assertKeyNotInCache(self, key):
+        """
+        Tests given key is in cache, making sure to get the hashed version of key first
+        """
+        finalized_key = get_hashed_cache_key(key)
+        self.assertFalse(finalized_key in cache)
 
 
 class FuncTypeTest(CacheHelperTestBase):
@@ -431,3 +434,75 @@ class CacheHelperExceptionsTestCase(CacheHelperTestBase):
             @cached(60*5)
             def test_function():
                 pass
+
+
+class CacheInvalidateTestCase(CacheHelperTestBase):
+    def test_invalidate_instance_method(self):
+        """
+        Tests that invalidate works on an instance method
+        """
+        expected_apple_cache_key = 'tests.Fruit.fun_math;MyNameIsApple,1,1;'
+
+        self.assertKeyNotInCache(expected_apple_cache_key)
+
+        # Call the function, store result in the cache
+        self.apple.fun_math(1, 1)
+        self.assertExpectedKeyInCache(expected_apple_cache_key)
+
+        # Invalidate the call, now the result is no longer in the cache
+        self.apple.fun_math.invalidate(self.apple, 1, 1)
+        self.assertKeyNotInCache(expected_apple_cache_key)
+
+    def test_invalidate_static_method(self):
+        """
+        Tests that invalidate works on a static method
+        """
+        expected_apple_cache_key = 'tests.Fruit.static_method;15;'
+
+        self.assertKeyNotInCache(expected_apple_cache_key)
+
+        # Call the function, store result in the cache
+        self.apple.static_method(15)
+        self.assertExpectedKeyInCache(expected_apple_cache_key)
+
+        # Invalidate the call, now the result is no longer in the cache
+        self.apple.static_method.invalidate(15)
+        self.assertKeyNotInCache(expected_apple_cache_key)
+
+    def test_invalidate_class_method(self):
+        """
+        Tests that invalidate works on a class method
+        """
+        expected_apple_cache_key = 'tests.Fruit.add_sweet_letter;x;'
+
+        self.assertKeyNotInCache(expected_apple_cache_key)
+
+        # Call the function, store result in the cache
+        Fruit.add_sweet_letter('x')
+        self.assertExpectedKeyInCache(expected_apple_cache_key)
+
+        # Invalidate the call, now the result is no longer in the cache
+        Fruit.add_sweet_letter.invalidate(Fruit, 'x')
+        self.assertKeyNotInCache(expected_apple_cache_key)
+
+    def test_invalidate_only_removes_one_key(self):
+        self.apple.fun_math(7, 15)
+        self.apple.fun_math(7, 16)
+        self.apple.fun_math(15, 7)
+        self.cherry.fun_math(7, 15)
+
+        expected_cache_keys = [
+            'tests.Fruit.fun_math;MyNameIsApple,7,15;',
+            'tests.Fruit.fun_math;MyNameIsApple,7,16;',
+            'tests.Fruit.fun_math;MyNameIsApple,15,7;',
+            'tests.Fruit.fun_math;MyNameIsCherry,7,15;',
+        ]
+
+        for key in expected_cache_keys:
+            self.assertExpectedKeyInCache(key)
+
+        self.apple.fun_math.invalidate(self.apple, 7, 15)
+
+        self.assertKeyNotInCache(expected_cache_keys[0])
+        for key in expected_cache_keys[1:]:
+            self.assertExpectedKeyInCache(key)
