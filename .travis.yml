@@ -41,4 +41,4 @@ install:
     # Install cache helper
     - pip install -e .
 script:
-    - python test_project/manage.py test test_project
+    - cd test_project && python manage.py test
