@@ -38,9 +38,7 @@ install:
     # Install the version of Django we are testing for and override
     # whatever version of Django that was in requirements.txt
     - pip install -q Django==$DJANGO_VERSION
-    # Install dev requirements for testing
-    - pip install -r dev_requirements.txt
     # Install cache helper
     - pip install -e .
 script:
-    - python test_project/manage.py test
+    - cd test_project && python manage.py test
