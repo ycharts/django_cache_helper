@@ -43,7 +43,6 @@ def cached(timeout):
                     pass
 
             return value
-
         return wrapper
 
     return _cached
