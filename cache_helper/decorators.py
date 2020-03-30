@@ -44,21 +44,6 @@ def cached(timeout):
 
             return value
 
-        def invalidate(*args, **kwargs):
-            """
-            A method to invalidate a result from the cache.
-
-            :param args: The args passed into the original function. This includes `self` for instance methods, and
-            `cls` for class methods.
-            :param kwargs: The kwargs passed into the original function.
-
-            :rtype: None
-            """
-            function_cache_key = utils.get_function_cache_key(func_type, func_name, args, kwargs)
-            cache_key = utils.get_hashed_cache_key(function_cache_key)
-            cache.delete(cache_key)
-
-        wrapper.invalidate = invalidate
         return wrapper
 
     return _cached
