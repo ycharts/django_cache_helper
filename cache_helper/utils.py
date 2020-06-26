@@ -1,19 +1,12 @@
 from hashlib import sha256
-import inspect
 
 from cache_helper import settings
 from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
 
-def get_function_cache_key(func_type, func_name, func_args, func_kwargs):
-    if func_type in ['method', 'function']:
-        args_string = _sanitize_args(*func_args, **func_kwargs)
-    elif func_type == 'class_method':
-        # In this case, since we are dealing with a class method, the first arg to the function
-        # will be the class. Since the name of the class and function is already built in to the
-        # cache key, we can bypass the class variable and instead slice from the first index.
-        args_string = _sanitize_args(*func_args[1:], **func_kwargs)
+def get_function_cache_key(func_name, func_args, func_kwargs):
+    args_string = _sanitize_args(*func_args, **func_kwargs)
     key = '{func_name}{args_string}'.format(func_name=func_name, args_string=args_string)
     return key
 
@@ -38,30 +31,8 @@ def _sanitize_args(*args, **kwargs):
     return key.format(args_key=args_key, kwargs_key=kwargs_key)
 
 
-def get_function_type(func):
-    """
-    Gets the type of the given function
-    """
-    if 'self' in inspect.getfullargspec(func).args:
-        return 'method'
-    if 'cls' in inspect.getfullargspec(func).args:
-        return 'class_method'
-
-    if inspect.isfunction(func):
-        return 'function'
-
-    return None
-
-
 def get_function_name(func):
-    func_type = get_function_type(func)
-
-    if func_type in ['method', 'class_method', 'function']:
-        name = '{func_module}.{qualified_name}'\
-            .format(func_module=func.__module__, qualified_name=func.__qualname__)
-        return name
-
-    return None
+    return '{func_module}.{qualified_name}'.format(func_module=func.__module__, qualified_name=func.__qualname__)
 
 
 def _plumb_collections(input_item):

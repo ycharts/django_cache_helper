@@ -6,9 +6,9 @@ from django.test import TestCase
 from django.core.cache import cache
 
 from cache_helper import settings
-from cache_helper.decorators import cached
+from cache_helper.decorators import cached, cached_class_method, cached_instance_method
 from cache_helper.interfaces import CacheHelperCacheable
-from cache_helper.utils import get_function_type, get_hashed_cache_key, get_function_cache_key
+from cache_helper.utils import get_hashed_cache_key, get_function_cache_key
 from cache_helper.exceptions import CacheKeyCreationError, CacheHelperFunctionError
 
 
@@ -32,19 +32,12 @@ class Vegetable(object):
     def fun_math(self, a, b):
         return a + b
 
-    @cached(60*60)
+    @cached_instance_method(60*60)
     def take_then_give_back(self, a):
         return a
 
-    def instance_method(self):
-        return self.name
-
     @classmethod
-    def class_method(cls):
-        return cls
-
-    @classmethod
-    @cached(60*60)
+    @cached_class_method(60*60)
     def add_sweet_letter(cls, a):
         return cls.__name__ + str(a)
 
@@ -66,16 +59,16 @@ class Fruit(object):
     def __str__(self):
         return 'MyNameIs{0}'.format(self.name)
 
-    @cached(60*60)
+    @cached_instance_method(60*60)
     def fun_math(self, a, b):
         return a + b
 
-    @cached(60*60)
+    @cached_instance_method(60*60)
     def take_then_give_back(self, a):
         return a
 
     @classmethod
-    @cached(60*60)
+    @cached_class_method(60*60)
     def add_sweet_letter(cls, a):
         return cls.__name__ + str(a)
 
@@ -135,27 +128,9 @@ class CacheHelperTestBase(TestCase):
         Tests given key is in cache, making sure to get the hashed version of key first
         """
         finalized_key = get_hashed_cache_key(key)
+        print(key)
+        print(finalized_key)
         self.assertTrue(finalized_key in cache)
-
-
-class FuncTypeTest(CacheHelperTestBase):
-    """
-    Test make sure functions catch right type
-    """
-    def assertFuncType(self, func, tp):
-        self.assertEqual(get_function_type(func), tp)
-
-    def test_module_func(self):
-        self.assertFuncType(foo, 'function')
-
-    def test_instance_method(self):
-        self.assertFuncType(self.celery.instance_method, 'method')
-
-    def test_static_method(self):
-        self.assertFuncType(Vegetable.static_method, 'function')
-
-    def test_class_method(self):
-        self.assertFuncType(Vegetable.class_method, 'class_method')
 
 
 class MultipleCallsDiffParamsTestCase(CacheHelperTestBase):
@@ -194,11 +169,11 @@ class KeyCreationTestCase(CacheHelperTestBase):
 
     def test_unusual_character_key_creation(self):
         return_string('āęìøü')
-        expected_key_unusual_chars = get_function_cache_key('function', 'test_project.tests.return_string', ('āęìøü',), {})
+        expected_key_unusual_chars = get_function_cache_key('test_project.tests.return_string', ('āęìøü',), {})
         self.assertExpectedKeyInCache(expected_key_unusual_chars)
 
         return_string('aeiou')
-        expected_key = get_function_cache_key('function', 'test_project.tests.return_string', ('aeiou',), {})
+        expected_key = get_function_cache_key('test_project.tests.return_string', ('aeiou',), {})
         self.assertExpectedKeyInCache(expected_key)
 
         self.assertNotEqual(expected_key_unusual_chars, expected_key)
@@ -208,12 +183,12 @@ class KeyCreationTestCase(CacheHelperTestBase):
         Two different classes with the same method name should have different cache keys
         """
         self.apple.take_then_give_back(self.cherry)
-        apple_take_give_back_cherry_key = get_function_cache_key('method', 'test_project.tests.Fruit.take_then_give_back',
+        apple_take_give_back_cherry_key = get_function_cache_key('test_project.tests.Fruit.take_then_give_back',
             (self.apple, self.cherry), {})
         self.assertExpectedKeyInCache(apple_take_give_back_cherry_key)
 
         self.celery.take_then_give_back(self.cherry)
-        celery_take_give_back_cherry_key = get_function_cache_key('method', 'test_project.tests.Vegetable.take_then_give_back',
+        celery_take_give_back_cherry_key = get_function_cache_key('test_project.tests.Vegetable.take_then_give_back',
             (self.celery, self.cherry), {})
         self.assertExpectedKeyInCache(celery_take_give_back_cherry_key)
 
@@ -224,13 +199,13 @@ class KeyCreationTestCase(CacheHelperTestBase):
         Two different classes with the same class method name should have different cache keys
         """
         self.apple.add_sweet_letter(self.cherry)
-        apple_add_sweet_cherry_key = get_function_cache_key('class_method', 'test_project.tests.Fruit.add_sweet_letter',
-            (self.apple, self.cherry), {})
+        apple_add_sweet_cherry_key = get_function_cache_key('test_project.tests.Fruit.add_sweet_letter',
+            (self.cherry,), {})
         self.assertExpectedKeyInCache(apple_add_sweet_cherry_key)
 
         self.celery.add_sweet_letter(self.cherry)
-        celery_add_sweet_cherry_key = get_function_cache_key('class_method', 'test_project.tests.Vegetable.add_sweet_letter',
-            (self.celery, self.cherry), {})
+        celery_add_sweet_cherry_key = get_function_cache_key('test_project.tests.Vegetable.add_sweet_letter',
+            (self.cherry,), {})
         self.assertExpectedKeyInCache(celery_add_sweet_cherry_key)
 
         self.assertNotEqual(apple_add_sweet_cherry_key, celery_add_sweet_cherry_key)
@@ -240,11 +215,11 @@ class KeyCreationTestCase(CacheHelperTestBase):
         Two different classes with the same static method name should have different cache keys
         """
         self.apple.static_method(self.cherry)
-        apple_static_method_key = get_function_cache_key('function', 'test_project.tests.Fruit.static_method', (self.cherry,), {})
+        apple_static_method_key = get_function_cache_key('test_project.tests.Fruit.static_method', (self.cherry,), {})
         self.assertExpectedKeyInCache(apple_static_method_key)
 
         self.celery.static_method(self.cherry)
-        celery_static_method_key = get_function_cache_key('function', 'test_project.tests.Vegetable.static_method', (self.cherry,),
+        celery_static_method_key = get_function_cache_key('test_project.tests.Vegetable.static_method', (self.cherry,),
             {})
         self.assertExpectedKeyInCache(celery_static_method_key)
 
@@ -255,11 +230,11 @@ class KeyCreationTestCase(CacheHelperTestBase):
         Two different classes with the same static method name should have different cache keys
         """
         Fruit.static_method(self.cherry)
-        fruit_static_method_key = get_function_cache_key('function', 'test_project.tests.Fruit.static_method', (self.cherry,), {})
+        fruit_static_method_key = get_function_cache_key('test_project.tests.Fruit.static_method', (self.cherry,), {})
         self.assertExpectedKeyInCache(fruit_static_method_key)
 
         Vegetable.static_method(self.cherry)
-        vegetable_static_method_key = get_function_cache_key('function', 'test_project.tests.Vegetable.static_method',
+        vegetable_static_method_key = get_function_cache_key('test_project.tests.Vegetable.static_method',
             (self.cherry,), {})
         self.assertExpectedKeyInCache(vegetable_static_method_key)
 
@@ -268,11 +243,11 @@ class KeyCreationTestCase(CacheHelperTestBase):
     def test_same_function_name_from_module_level(self):
         """Two different functions with same name should have different cache keys"""
         Vegetable.foo(1, 2)
-        vegetable_static_method_key = get_function_cache_key('function', 'test_project.tests.Vegetable.foo', (1, 2), {})
+        vegetable_static_method_key = get_function_cache_key('test_project.tests.Vegetable.foo', (1, 2), {})
         self.assertExpectedKeyInCache(vegetable_static_method_key)
 
         foo(1, 2)
-        module_function_key = get_function_cache_key('function', 'test_project.tests.foo', (1, 2), {})
+        module_function_key = get_function_cache_key('test_project.tests.foo', (1, 2), {})
         self.assertExpectedKeyInCache(module_function_key)
 
         self.assertNotEqual(vegetable_static_method_key, module_function_key)
@@ -330,8 +305,7 @@ class CacheableTestCase(CacheHelperTestBase):
         self.assertExpectedKeyInCache(expected_cache_key)
 
     @patch('test_project.tests.Meat.get_grams_protein', return_value=20)
-    @patch('cache_helper.utils.get_function_type', return_value='function')
-    def test_decorator_only_calls_function_once_if_value_cached(self, _, mock_get_grams_protein):
+    def test_decorator_only_calls_function_once_if_value_cached(self, mock_get_grams_protein):
         """
         If decorated function was already called with same args, decorator won't call wrapped function twice
         """
@@ -346,8 +320,7 @@ class CacheableTestCase(CacheHelperTestBase):
         self.assertEqual(mock_get_grams_protein.call_count, 1)
 
     @patch('test_project.tests.Meat.get_grams_protein', return_value=20)
-    @patch('cache_helper.utils.get_function_type', return_value='function')
-    def test_decorator_only_calls_function_twice_when_supplied_different_args(self, _, mock_get_grams_protein):
+    def test_decorator_only_calls_function_twice_when_supplied_different_args(self, mock_get_grams_protein):
         """
         Decorator calls function twice when supplied with different args
         """
@@ -403,24 +376,3 @@ class CacheableTestCase(CacheHelperTestBase):
         expected_cache_key = 'test_project.tests.Meat.get_grams_protein;;,meat,Chicken:20'
         self.assertExpectedKeyInCache(expected_cache_key)
 
-
-class CacheHelperExceptionsTestCase(CacheHelperTestBase):
-    @patch('cache_helper.utils.get_function_type', return_value=None)
-    def test_no_func_type_raises_exception(self, _):
-        """
-        CacheHelperFunctionError should be raised when issue determining function type
-        """
-        with self.assertRaises(CacheHelperFunctionError):
-            @cached(60*5)
-            def test_function():
-                pass
-
-    @patch('cache_helper.utils.get_function_name', return_value=None)
-    def test_no_func_name_raises_exception(self, _):
-        """
-        CacheHelperFunctionError should be raised when issue determining function name
-        """
-        with self.assertRaises(CacheHelperFunctionError):
-            @cached(60*5)
-            def test_function():
-                pass
