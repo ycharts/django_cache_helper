@@ -128,8 +128,6 @@ class CacheHelperTestBase(TestCase):
         Tests given key is in cache, making sure to get the hashed version of key first
         """
         finalized_key = get_hashed_cache_key(key)
-        print(key)
-        print(finalized_key)
         self.assertTrue(finalized_key in cache)
 
 
