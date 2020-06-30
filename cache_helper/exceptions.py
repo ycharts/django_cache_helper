@@ -4,7 +4,3 @@ class CacheHelperException(Exception):
 
 class CacheKeyCreationError(CacheHelperException):
     pass
-
-
-class CacheHelperFunctionError(CacheHelperException):
-    pass
