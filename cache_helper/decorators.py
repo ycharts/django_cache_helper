@@ -36,7 +36,21 @@ def cached(timeout):
 
             return value
 
+        def invalidate(*args, **kwargs):
+            """
+            A method to invalidate a result from the cache.
+            :param args: The args passed into the original function. This includes `self` for instance methods, and
+            `cls` for class methods.
+            :param kwargs: The kwargs passed into the original function.
+            :rtype: None
+            """
+            function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
+            cache_key = utils.get_hashed_cache_key(function_cache_key)
+            cache.delete(cache_key)
+
+        wrapper.invalidate = invalidate
         return wrapper
+
     return _cached
 
 
@@ -49,6 +63,7 @@ def cached_class_method(timeout):
         def wrapper(*args, **kwargs):
             # skip the first qarg because it will be the class itself
             function_cache_key = utils. get_function_cache_key(func_name, args[1:], kwargs)
+            print(function_cache_key)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
@@ -68,7 +83,21 @@ def cached_class_method(timeout):
 
             return value
 
+        def invalidate(*args, **kwargs):
+            """
+            A method to invalidate a result from the cache.
+            :param args: The args passed into the original function. This includes `self` for instance methods, and
+            `cls` for class methods.
+            :param kwargs: The kwargs passed into the original function.
+            :rtype: None
+            """
+            function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
+            cache_key = utils.get_hashed_cache_key(function_cache_key)
+            cache.delete(cache_key)
+
+        wrapper.invalidate = invalidate
         return wrapper
+
     return _cached
 
 
@@ -76,9 +105,11 @@ def cached_instance_method(timeout):
 
     def _cached(func):
         func_name = utils.get_function_name(func)
+        print(func)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
+            # print(func)
             function_cache_key = utils. get_function_cache_key(func_name, args, kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
@@ -100,4 +131,5 @@ def cached_instance_method(timeout):
             return value
 
         return wrapper
+
     return _cached
