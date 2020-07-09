@@ -383,21 +383,21 @@ class CacheableTestCase(CacheHelperTestBase):
 
 
 class CacheInvalidateTestCase(CacheHelperTestBase):
-    # def test_invalidate_instance_method(self):
-    #     """
-    #     Tests that invalidate works on an instance method
-    #     """
-    #     expected_apple_cache_key = 'test_project.tests.Fruit.fun_math;MyNameIsApple,1,1;'
-    #
-    #     self.assertKeyNotInCache(expected_apple_cache_key)
-    #
-    #     # Call the function, store result in the cache
-    #     self.apple.fun_math(1, 1)
-    #     self.assertExpectedKeyInCache(expected_apple_cache_key)
-    #
-    #     # Invalidate the call, now the result is no longer in the cache
-    #     self.apple.fun_math.invalidate(self.apple, 1, 1)
-    #     self.assertKeyNotInCache(expected_apple_cache_key)
+    def test_invalidate_instance_method(self):
+        """
+        Tests that invalidate works on an instance method
+        """
+        expected_apple_cache_key = 'test_project.tests.Fruit.fun_math;MyNameIsApple,1,1;'
+
+        self.assertKeyNotInCache(expected_apple_cache_key)
+
+        # Call the function, store result in the cache
+        self.apple.fun_math(1, 1)
+        self.assertExpectedKeyInCache(expected_apple_cache_key)
+
+        # Invalidate the call, now the result is no longer in the cache
+        self.apple.fun_math.invalidate(1, 1)
+        self.assertKeyNotInCache(expected_apple_cache_key)
 
     def test_invalidate_static_method(self):
         """
@@ -432,6 +432,9 @@ class CacheInvalidateTestCase(CacheHelperTestBase):
         self.assertKeyNotInCache(expected_apple_cache_key)
 
     def test_invalidate_only_removes_one_key(self):
+        """
+        Tests that calling invalidate only removes a single key, and does not disturb other similar keys in the cache.
+        """
         self.apple.fun_math(7, 15)
         self.apple.fun_math(7, 16)
         self.apple.fun_math(15, 7)
@@ -447,7 +450,7 @@ class CacheInvalidateTestCase(CacheHelperTestBase):
         for key in expected_cache_keys:
             self.assertExpectedKeyInCache(key)
 
-        self.apple.fun_math.invalidate(self.apple, 7, 15)
+        self.apple.fun_math.invalidate(7, 15)
 
         self.assertKeyNotInCache(expected_cache_keys[0])
         for key in expected_cache_keys[1:]:
