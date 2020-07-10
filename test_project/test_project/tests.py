@@ -1,457 +1,525 @@
-from hashlib import sha256
-
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 from django.test import TestCase
 from django.core.cache import cache
 
-from cache_helper import settings
 from cache_helper.decorators import cached, cached_class_method, cached_instance_method
 from cache_helper.interfaces import CacheHelperCacheable
-from cache_helper.utils import get_hashed_cache_key, get_function_cache_key
-from cache_helper.exceptions import CacheKeyCreationError, CacheHelperFunctionError
+
+from datetime import datetime
 
 
-@cached(60*60)
-def foo(a, b):
-    return a + b
+class Incrementer:
+    class_counter = 500
 
-
-@cached(5*60)
-def return_string(s):
-    return s
-
-
-class Vegetable(object):
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return 'MyNameIs{0}'.format(self.name)
-
-    def fun_math(self, a, b):
-        return a + b
+    def __init__(self, instance_counter):
+        self.instance_counter = instance_counter
 
     @cached_instance_method(60*60)
-    def take_then_give_back(self, a):
-        return a
+    def instance_increment_by(self, num):
+        self.instance_counter += num
+        return self.instance_counter
 
     @classmethod
     @cached_class_method(60*60)
-    def add_sweet_letter(cls, a):
-        return cls.__name__ + str(a)
+    def class_increment_by(cls, num):
+        cls.class_counter += num
+        return cls.class_counter
 
     @staticmethod
     @cached(60*60)
-    def static_method(a):
-        return a
+    def get_datetime(useless_arg, useless_kwarg=None):
+        return datetime.utcnow()
 
     @staticmethod
     @cached(60*60)
-    def foo(a, b):
-        return a + b
+    def func_with_multiple_args_and_kwargs(arg_1, arg_2, kwarg_1=None, kwarg_2='a string'):
+        return datetime.utcnow()
 
 
-class Fruit(object):
-    def __init__(self, name):
-        self.name = name
+class SubclassIncrementer(Incrementer):
+    class_counter = 500
 
-    def __str__(self):
-        return 'MyNameIs{0}'.format(self.name)
-
-    @cached_instance_method(60*60)
-    def fun_math(self, a, b):
-        return a + b
+    def __init__(self, instance_counter):
+        self.instance_counter = instance_counter
+        super().__init__(instance_counter)
 
     @cached_instance_method(60*60)
-    def take_then_give_back(self, a):
-        return a
+    def instance_increment_by(self, num):
+        self.instance_counter += (num * 10)
+        return self.instance_counter
 
     @classmethod
     @cached_class_method(60*60)
-    def add_sweet_letter(cls, a):
-        return cls.__name__ + str(a)
+    def class_increment_by(cls, num):
+        cls.class_counter += (num * 10)
+        return cls.class_counter
 
     @staticmethod
     @cached(60*60)
-    def static_method(a):
-        return a
+    def get_datetime(useless_arg, useless_kwarg=None):
+        return datetime.utcnow()
 
 
-class Meat(CacheHelperCacheable):
-    def __init__(self, name, grams_protein):
-        self.name = name
-        self.grams_protein = grams_protein
+class UnimplementedSubclassIncrementer(Incrementer):
+    def __init__(self, instance_counter):
+        super().__init__(instance_counter)
 
-    def __str__(self):
-        return 'MyNameIs{0}'.format(self.name)
+
+class AnotherIncrementer:
+    class_counter = 500
+
+    def __init__(self, instance_counter):
+        self.instance_counter = instance_counter
+
+    @cached_instance_method(60*60)
+    def instance_increment_by(self, num):
+        self.instance_counter -= num
+        return self.instance_counter
+
+    @classmethod
+    @cached_class_method(60*60)
+    def class_increment_by(cls, num):
+        cls.class_counter -= num
+        return cls.class_counter
+
+    @staticmethod
+    @cached(60*60)
+    def get_datetime(useless_arg, useless_kwarg=None):
+        return datetime.utcnow()
+
+
+class EqualIfSumIsEqual(CacheHelperCacheable):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
     def get_cache_helper_key(self):
-        return '{name}:{grams_protein}'.format(name=self.name, grams_protein=self.grams_protein)
+        return 'sum={}'.format(self.x + self.y)
 
-    @staticmethod
-    @cached(60*5)
-    def get_grams_protein(meat):
-        return meat.grams_protein
-
-    @staticmethod
-    @cached(60*60)
-    def get_tastier_option(meat, veggie):
-        return meat
-
-    @staticmethod
-    @cached(60*60)
-    def get_protein_sum(meats):
-        return sum(meat.grams_protein for meat in meats)
+    @cached_instance_method(60*60)
+    def get_product(self):
+        return self.x * self.y
 
 
-class CacheHelperTestBase(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.apple = Fruit('Apple')
-        cls.cherry = Fruit('Cherry')
-
-        cls.celery = Vegetable('Celery')
-
-        cls.chicken = Meat(name='Chicken', grams_protein=20)
-        cls.steak = Meat(name='Steak', grams_protein=26)
-
-    @classmethod
-    def tearDownClass(cls):
-        pass
+class CachedInstanceMethodTests(TestCase):
 
     def tearDown(self):
+        super().tearDown()
         cache.clear()
 
-    def assertExpectedKeyInCache(self, key):
+    def test_cached_instance_method_basic(self):
         """
-        Tests given key is in cache, making sure to get the hashed version of key first
+        Tests that calling a cached instance method with the same arguments uses the cached values.
         """
-        finalized_key = get_hashed_cache_key(key)
-        self.assertTrue(finalized_key in cache)
+        incrementer = Incrementer(100)
 
-    def assertKeyNotInCache(self, key):
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(incrementer.instance_increment_by(1), 101)
+        self.assertEqual(incrementer.instance_increment_by(2), 103)
+
+        # Stale results are retrieved from the cache instead of calling increment() again
+        self.assertEqual(incrementer.instance_increment_by(1), 101)
+        self.assertEqual(incrementer.instance_increment_by(2), 103)
+
+    def test_cached_instance_method_with_two_instances_of_same_class(self):
         """
-        Tests given key is in cache, making sure to get the hashed version of key first
+        Tests that
         """
-        finalized_key = get_hashed_cache_key(key)
-        self.assertFalse(finalized_key in cache)
+        incrementer_1 = Incrementer(100)
+        incrementer_2 = Incrementer(200)
 
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
 
-class MultipleCallsDiffParamsTestCase(CacheHelperTestBase):
+        # Same args, but different instance, so the function actually gets called
+        self.assertEqual(incrementer_2.instance_increment_by(1), 201)
+        self.assertEqual(incrementer_2.instance_increment_by(2), 203)
 
-    def test_two_models(self):
-        # Call first time and place in cache
-        apple_val = self.apple.fun_math(10, 10)
-        expected_apple_cache_key = 'test_project.tests.Fruit.fun_math;MyNameIsApple,10,10;'
+        # Stale results for both incrementers now
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
+        self.assertEqual(incrementer_2.instance_increment_by(1), 201)
+        self.assertEqual(incrementer_2.instance_increment_by(2), 203)
 
-        cherry_val = self.cherry.fun_math(15, 10)
-        expected_cherry_cache_key = 'test_project.tests.Fruit.fun_math;MyNameIsCherry,15,10;'
-
-        self.assertExpectedKeyInCache(expected_apple_cache_key)
-        self.assertExpectedKeyInCache(expected_cherry_cache_key)
-
-        self.assertEqual(self.apple.fun_math(10, 10), apple_val)
-        self.assertEqual(self.cherry.fun_math(15, 10), cherry_val)
-
-    def test_class_method(self):
-        Fruit.add_sweet_letter('a')
-        Fruit.add_sweet_letter('c')
-
-        add_sweet_letter_a_key = 'test_project.tests.Fruit.add_sweet_letter;a;'
-        add_sweet_letter_c_key = 'test_project.tests.Fruit.add_sweet_letter;c;'
-
-        self.assertExpectedKeyInCache(add_sweet_letter_a_key)
-        self.assertExpectedKeyInCache(add_sweet_letter_c_key)
-
-        self.assertEqual(Fruit.add_sweet_letter('a'), 'Fruita')
-        self.assertEqual(Fruit.add_sweet_letter('c'), 'Fruitc')
-
-
-class KeyCreationTestCase(CacheHelperTestBase):
-    def tearDown(self):
-        settings.MAX_DEPTH = 2
-
-    def test_unusual_character_key_creation(self):
-        return_string('āęìøü')
-        expected_key_unusual_chars = get_function_cache_key('test_project.tests.return_string', ('āęìøü',), {})
-        self.assertExpectedKeyInCache(expected_key_unusual_chars)
-
-        return_string('aeiou')
-        expected_key = get_function_cache_key('test_project.tests.return_string', ('aeiou',), {})
-        self.assertExpectedKeyInCache(expected_key)
-
-        self.assertNotEqual(expected_key_unusual_chars, expected_key)
-
-    def test_same_method_name_different_class(self):
+    def test_cached_instance_methods_with_same_name_subclass(self):
         """
-        Two different classes with the same method name should have different cache keys
+        Tests that
         """
-        self.apple.take_then_give_back(self.cherry)
-        apple_take_give_back_cherry_key = get_function_cache_key('test_project.tests.Fruit.take_then_give_back',
-            (self.apple, self.cherry), {})
-        self.assertExpectedKeyInCache(apple_take_give_back_cherry_key)
+        incrementer_1 = Incrementer(100)
+        incrementer_2 = SubclassIncrementer(100)
 
-        self.celery.take_then_give_back(self.cherry)
-        celery_take_give_back_cherry_key = get_function_cache_key('test_project.tests.Vegetable.take_then_give_back',
-            (self.celery, self.cherry), {})
-        self.assertExpectedKeyInCache(celery_take_give_back_cherry_key)
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
 
-        self.assertNotEqual(apple_take_give_back_cherry_key, celery_take_give_back_cherry_key)
+        # Different instance with same args hasn't been computed before
+        self.assertEqual(incrementer_2.instance_increment_by(1), 110)
+        self.assertEqual(incrementer_2.instance_increment_by(2), 130)
 
-    def test_same_class_method_name_different_class(self):
+        # Stale results for both incrementers now
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
+        self.assertEqual(incrementer_2.instance_increment_by(1), 110)
+        self.assertEqual(incrementer_2.instance_increment_by(2), 130)
+
+    def test_cached_instance_methods_with_same_name_unimplemented_subclass(self):
         """
-        Two different classes with the same class method name should have different cache keys
+        Tests that
         """
-        self.apple.add_sweet_letter(self.cherry)
-        apple_add_sweet_cherry_key = get_function_cache_key('test_project.tests.Fruit.add_sweet_letter',
-            (self.cherry,), {})
-        self.assertExpectedKeyInCache(apple_add_sweet_cherry_key)
+        incrementer_1 = Incrementer(100)
+        incrementer_2 = UnimplementedSubclassIncrementer(100)
 
-        self.celery.add_sweet_letter(self.cherry)
-        celery_add_sweet_cherry_key = get_function_cache_key('test_project.tests.Vegetable.add_sweet_letter',
-            (self.cherry,), {})
-        self.assertExpectedKeyInCache(celery_add_sweet_cherry_key)
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
 
-        self.assertNotEqual(apple_add_sweet_cherry_key, celery_add_sweet_cherry_key)
+        # Different instance with same args hasn't been computed before
+        self.assertEqual(incrementer_2.instance_increment_by(2), 102)
+        self.assertEqual(incrementer_2.instance_increment_by(1), 103)
 
-    def test_same_static_method_name_different_class_instance_reference(self):
+        # Stale results for both incrementers now
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
+        self.assertEqual(incrementer_2.instance_increment_by(1), 103)
+        self.assertEqual(incrementer_2.instance_increment_by(2), 102)
+
+    def test_cached_instance_method_with_same_name_different_class(self):
         """
-        Two different classes with the same static method name should have different cache keys
+        Tests that
         """
-        self.apple.static_method(self.cherry)
-        apple_static_method_key = get_function_cache_key('test_project.tests.Fruit.static_method', (self.cherry,), {})
-        self.assertExpectedKeyInCache(apple_static_method_key)
+        incrementer_1 = Incrementer(100)
+        incrementer_2 = AnotherIncrementer(100)
 
-        self.celery.static_method(self.cherry)
-        celery_static_method_key = get_function_cache_key('test_project.tests.Vegetable.static_method', (self.cherry,),
-            {})
-        self.assertExpectedKeyInCache(celery_static_method_key)
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
 
-        self.assertNotEqual(apple_static_method_key, celery_static_method_key)
+        # Different instance with same args hasn't been computed before
+        self.assertEqual(incrementer_2.instance_increment_by(1), 99)
+        self.assertEqual(incrementer_2.instance_increment_by(2), 97)
 
-    def test_same_static_method_name_different_class_class_reference(self):
-        """
-        Two different classes with the same static method name should have different cache keys
-        """
-        Fruit.static_method(self.cherry)
-        fruit_static_method_key = get_function_cache_key('test_project.tests.Fruit.static_method', (self.cherry,), {})
-        self.assertExpectedKeyInCache(fruit_static_method_key)
+        # Stale results for both incrementers now
+        self.assertEqual(incrementer_1.instance_increment_by(1), 101)
+        self.assertEqual(incrementer_1.instance_increment_by(2), 103)
+        self.assertEqual(incrementer_2.instance_increment_by(1), 99)
+        self.assertEqual(incrementer_2.instance_increment_by(2), 97)
 
-        Vegetable.static_method(self.cherry)
-        vegetable_static_method_key = get_function_cache_key('test_project.tests.Vegetable.static_method',
-            (self.cherry,), {})
-        self.assertExpectedKeyInCache(vegetable_static_method_key)
-
-        self.assertNotEqual(fruit_static_method_key, vegetable_static_method_key)
-
-    def test_same_function_name_from_module_level(self):
-        """Two different functions with same name should have different cache keys"""
-        Vegetable.foo(1, 2)
-        vegetable_static_method_key = get_function_cache_key('test_project.tests.Vegetable.foo', (1, 2), {})
-        self.assertExpectedKeyInCache(vegetable_static_method_key)
-
-        foo(1, 2)
-        module_function_key = get_function_cache_key('test_project.tests.foo', (1, 2), {})
-        self.assertExpectedKeyInCache(module_function_key)
-
-        self.assertNotEqual(vegetable_static_method_key, module_function_key)
-
-    def test_args_kwargs_properly_convert_to_string(self):
-        """
-        Surface level objects are serialized correctly with default settings...
-        """
-        self.apple.take_then_give_back(self.cherry)
-        apple_take_cherry_key = 'test_project.tests.Fruit.take_then_give_back;MyNameIsApple,MyNameIsCherry;'
-        self.assertExpectedKeyInCache(apple_take_cherry_key)
-
-    def test_dict_args_properly_convert_to_string(self):
-        self.apple.take_then_give_back({1: self.cherry})
-        hashed_dict_key = sha256(str(1).encode('utf-8')).hexdigest()
-        expected_cache_key = 'test_project.tests.Fruit.take_then_give_back;MyNameIsApple,,,{0},MyNameIsCherry;'.format(hashed_dict_key)
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-    def test_dict_args_keep_the_same_order_when_convert_to_string(self):
-        dict_arg = {1: self.cherry, 'string': 'ay carambe'}
-        self.apple.take_then_give_back(dict_arg)
-        expected_key = 'test_project.tests.Fruit.take_then_give_back;MyNameIsApple,,,' \
-                       '473287f8298dba7163a897908958f7c0eae733e25d2e027992ea2edc9bed2fa8,ay carambe,,' \
-                       '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,MyNameIsCherry;'
-        self.assertExpectedKeyInCache(expected_key)
-
-    def test_set_args_properly_maintain_order_and_convert_to_string(self):
-        self.apple.take_then_give_back({1, 'vegetable', self.cherry})
-        expected_key = 'test_project.tests.Fruit.take_then_give_back;MyNameIsApple,,' \
-                       '4715b734085d8d9c9981d91c6d5cff398c75caf44074851baa94f2de24fba4d7,' \
-                       '6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b,' \
-                       'f8201a5264b6b89b4d92c5bc46aa2e5c3e9610e8fc9ef200df1a39c7f10e7af6;'
-        self.assertExpectedKeyInCache(expected_key)
-
-    def test_list_args_properly_convert_to_string(self):
-        self.apple.take_then_give_back([self.cherry])
-        expected_cache_key = 'test_project.tests.Fruit.take_then_give_back;MyNameIsApple,,MyNameIsCherry;'
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-    def test_raises_depth_error(self):
-        settings.MAX_DEPTH = 0
-        with self.assertRaises(CacheKeyCreationError):
-            self.apple.take_then_give_back([self.cherry])
-
-
-class CacheableTestCase(CacheHelperTestBase):
-
-    def test_key_for_function_with_cache_helper_cacheable_arg(self):
-        """
-        An instance of a class that implements the CacheHelperCacheable class should use the get_cache_helper_key
-        """
-        Meat.get_grams_protein(self.chicken)
-        expected_cache_key = 'test_project.tests.Meat.get_grams_protein;Chicken:20;'
-        self.assertTrue(self.chicken.get_cache_helper_key() in expected_cache_key)
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-    @patch('test_project.tests.Meat.get_grams_protein', return_value=20)
-    def test_decorator_only_calls_function_once_if_value_cached(self, mock_get_grams_protein):
-        """
-        If decorated function was already called with same args, decorator won't call wrapped function twice
-        """
-        # Set qualname since internal function uses it
-        mock_get_grams_protein.__qualname__ = 'test_project.tests.Meat.get_grams_protein'
-        decorated_mock_grams_protein = cached(timeout=5*60)(mock_get_grams_protein)
-        decorated_mock_grams_protein(self.chicken)
-        # Call the function twice with the same args
-        decorated_mock_grams_protein(self.chicken)
-        # calling the decorated mock function twice with the same args should only call the mock function once
-        # as the return value should be stored inside the cache
-        self.assertEqual(mock_get_grams_protein.call_count, 1)
-
-    @patch('test_project.tests.Meat.get_grams_protein', return_value=20)
-    def test_decorator_only_calls_function_twice_when_supplied_different_args(self, mock_get_grams_protein):
-        """
-        Decorator calls function twice when supplied with different args
-        """
-        # Set qualname since internal function uses it
-        mock_get_grams_protein.__qualname__ = 'test_project.tests.Meat.get_grams_protein'
-        decorated_mock_grams_protein = cached(timeout=5*60)(mock_get_grams_protein)
-        decorated_mock_grams_protein(self.chicken)
-        # Call the function with different args to see if function will be called again
-        decorated_mock_grams_protein(self.steak)
-        self.assertEqual(mock_get_grams_protein.call_count, 2)
-
-    def test_key_for_cacheable_function_with_mixed_cacheable_args(self):
-        """
-        Test when a cached function takes in both a CacheHelperCacheable object and a regular object
-        """
-        Meat.get_tastier_option(self.chicken, self.celery)
-        expected_cache_key = 'test_project.tests.Meat.get_tastier_option;Chicken:20,MyNameIsCelery;'
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-    def test_key_for_list_of_cacheable_objects(self):
-        """
-        Test when a cached function takes in a list of CacheHelperCacheable objects
-        """
-        Meat.get_protein_sum([self.chicken, self.steak])
-        expected_cache_key = 'test_project.tests.Meat.get_protein_sum;,Chicken:20,Steak:26;'
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-    def test_key_for_set_of_cacheable_objects(self):
-        """
-        Test when a cached function takes in a set of CacheHelperCacheable objects
-        """
-        Meat.get_protein_sum({self.steak, self.chicken})
-        expected_cache_key = 'test_project.tests.Meat.get_protein_sum;,' \
-                             '6dd472107034f41f27f301ddbcc97ba4bc0d54945e759d170268aa1091c436fe,' \
-                             '9ff36157b4df732256fe3b151cbf8a6bdcc22969d4d6ceaad588bccbbd5c942f;'
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-    def test_key_for_dict_of_cacheable_objects(self):
-        """
-        Test when a cached function takes in a dict with CacheHelperCacheable objects as keys
-        """
-        Meat.get_tastier_option({self.chicken: 'Tasty'}, {self.celery: 'Terrible'})
-        expected_cache_key = 'test_project.tests.Meat.get_tastier_option;' \
-                             ',,9ff36157b4df732256fe3b151cbf8a6bdcc22969d4d6ceaad588bccbbd5c942f,Tasty,' \
-                             ',,8a332387e40497a972a0ab2099659b49b99be0d00130158f9cb92ecc93ca5b18,Terrible;'
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-    def test_key_for_function_with_cache_helper_cacheable_object_as_kwarg(self):
-        """
-        Test when a cached function is called with a CacheHelperCacheable object as a kwarg
-        """
-        Meat.get_grams_protein(meat=self.chicken)
-        expected_cache_key = 'test_project.tests.Meat.get_grams_protein;;,meat,Chicken:20'
-        self.assertExpectedKeyInCache(expected_cache_key)
-
-
-class CacheInvalidateTestCase(CacheHelperTestBase):
     def test_invalidate_instance_method(self):
         """
         Tests that invalidate works on an instance method
         """
-        expected_apple_cache_key = 'test_project.tests.Fruit.fun_math;MyNameIsApple,1,1;'
+        incrementer = Incrementer(100)
 
-        self.assertKeyNotInCache(expected_apple_cache_key)
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(incrementer.instance_increment_by(1), 101)
+        self.assertEqual(incrementer.instance_increment_by(2), 103)
 
-        # Call the function, store result in the cache
-        self.apple.fun_math(1, 1)
-        self.assertExpectedKeyInCache(expected_apple_cache_key)
+        # Stale results are retrieved from the cache instead of calling increment() again
+        self.assertEqual(incrementer.instance_increment_by(1), 101)
+        self.assertEqual(incrementer.instance_increment_by(2), 103)
 
-        # Invalidate the call, now the result is no longer in the cache
-        self.apple.fun_math.invalidate(1, 1)
-        self.assertKeyNotInCache(expected_apple_cache_key)
+        # invalidate 1
+        incrementer.instance_increment_by.invalidate(1)
 
-    def test_invalidate_static_method(self):
+        # 1 gets recomputed
+        self.assertEqual(incrementer.instance_increment_by(1), 104)
+
+        # but 2 is still stale
+        self.assertEqual(incrementer.instance_increment_by(2), 103)
+
+
+class CachedClassMethodTests(TestCase):
+
+    def tearDown(self):
+        super().tearDown()
+
+        Incrementer.class_counter = 500
+        SubclassIncrementer.class_counter = 500
+        UnimplementedSubclassIncrementer.class_counter = 500
+        AnotherIncrementer.class_counter = 500
+
+        cache.clear()
+
+    def test_cached_class_method_basic(self):
         """
-        Tests that invalidate works on a static method
+        Tests that calling a cached class method with the same arguments uses the cached values.
         """
-        expected_apple_cache_key = 'test_project.tests.Fruit.static_method;15;'
+        # Hasn't been computed before, so the function actually gets called
+        Incrementer.class_increment_by(1)
+        Incrementer.class_increment_by(2)
 
-        self.assertKeyNotInCache(expected_apple_cache_key)
+        # Stale results are retrieved from the cache instead of calling increment() again
+        Incrementer.class_increment_by(1)
+        Incrementer.class_increment_by(2)
 
-        # Call the function, store result in the cache
-        self.apple.static_method(15)
-        self.assertExpectedKeyInCache(expected_apple_cache_key)
+    def test_cached_class_methods_with_same_name_subclass(self):
+        """
+        Tests that
+        """
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
 
-        # Invalidate the call, now the result is no longer in the cache
-        self.apple.static_method.invalidate(15)
-        self.assertKeyNotInCache(expected_apple_cache_key)
+        # Different class with same args hasn't been computed before
+        self.assertEqual(SubclassIncrementer.class_increment_by(1), 510)
+        self.assertEqual(SubclassIncrementer.class_increment_by(2), 530)
+
+        # Stale results for both Incrementers now
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+        self.assertEqual(SubclassIncrementer.class_increment_by(1), 510)
+        self.assertEqual(SubclassIncrementer.class_increment_by(2), 530)
+
+    def test_cached_class_methods_with_same_name_unimplemented_subclass(self):
+        """
+        Tests that
+        """
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+
+        # Stale results since the subclass has not implemented its own class_increment_by method
+        self.assertEqual(UnimplementedSubclassIncrementer.class_increment_by(2), 503)
+        self.assertEqual(UnimplementedSubclassIncrementer.class_increment_by(1), 501)
+
+        # Stale results for both Incrementers now
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+        self.assertEqual(UnimplementedSubclassIncrementer.class_increment_by(1), 501)
+        self.assertEqual(UnimplementedSubclassIncrementer.class_increment_by(2), 503)
+
+    def test_cached_class_method_with_same_name_different_class(self):
+        """
+        Tests that
+        """
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+
+        # Different class with same args hasn't been computed before
+        self.assertEqual(AnotherIncrementer.class_increment_by(1), 499)
+        self.assertEqual(AnotherIncrementer.class_increment_by(2), 497)
+
+        # Stale results for both Incrementers now
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+        self.assertEqual(AnotherIncrementer.class_increment_by(1), 499)
+        self.assertEqual(AnotherIncrementer.class_increment_by(2), 497)
 
     def test_invalidate_class_method(self):
         """
-        Tests that invalidate works on a class method
+        Tests that invalidate works on an class method
         """
-        expected_apple_cache_key = 'test_project.tests.Fruit.add_sweet_letter;x;'
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
 
-        self.assertKeyNotInCache(expected_apple_cache_key)
+        # Stale results are retrieved from the cache instead of calling increment() again
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
 
-        # Call the function, store result in the cache
-        Fruit.add_sweet_letter('x')
-        self.assertExpectedKeyInCache(expected_apple_cache_key)
+        # invalidate 1
+        Incrementer.class_increment_by.invalidate(1)
 
-        # Invalidate the call, now the result is no longer in the cache
-        Fruit.add_sweet_letter.invalidate('x')
-        self.assertKeyNotInCache(expected_apple_cache_key)
+        # 1 gets recomputed
+        self.assertEqual(Incrementer.class_increment_by(1), 504)
 
-    def test_invalidate_only_removes_one_key(self):
+        # but 2 is still stale
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+
+
+class CachedStaticMethodTests(TestCase):
+
+    def tearDown(self):
+        super().tearDown()
+        cache.clear()
+
+    def test_cached_static_method_basic(self):
         """
-        Tests that calling invalidate only removes a single key, and does not disturb other similar keys in the cache.
+        Tests that calling a cached class method with the same arguments uses the cached values.
         """
-        self.apple.fun_math(7, 15)
-        self.apple.fun_math(7, 16)
-        self.apple.fun_math(15, 7)
-        self.cherry.fun_math(7, 15)
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.get_datetime(1)
+        initial_datetime_2 = Incrementer.get_datetime(2)
+        self.assertNotEqual(initial_datetime_1, initial_datetime_2)
 
-        expected_cache_keys = [
-            'test_project.tests.Fruit.fun_math;MyNameIsApple,7,15;',
-            'test_project.tests.Fruit.fun_math;MyNameIsApple,7,16;',
-            'test_project.tests.Fruit.fun_math;MyNameIsApple,15,7;',
-            'test_project.tests.Fruit.fun_math;MyNameIsCherry,7,15;',
-        ]
+        # Stale results are retrieved from the cache instead of calling inner_func() again
+        cached_datetime_1 = Incrementer.get_datetime(1)
+        cached_datetime_2 = Incrementer.get_datetime(2)
+        self.assertEqual(initial_datetime_1, cached_datetime_1)
+        self.assertEqual(initial_datetime_2, cached_datetime_2)
 
-        for key in expected_cache_keys:
-            self.assertExpectedKeyInCache(key)
+    def test_cached_static_methods_with_same_name_subclass(self):
+        """
+        Tests that
+        """
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.get_datetime(1)
+        initial_datetime_2 = Incrementer.get_datetime(2)
+        self.assertNotEqual(initial_datetime_1, initial_datetime_2)
 
-        self.apple.fun_math.invalidate(7, 15)
+        # Hasn't been computed before, so the function actually gets called
+        initial_subclass_datetime_1 = SubclassIncrementer.get_datetime(1)
+        initial_subclass_datetime_2 = SubclassIncrementer.get_datetime(2)
+        self.assertNotEqual(initial_subclass_datetime_1, initial_subclass_datetime_2)
+        self.assertNotEqual(initial_datetime_1, initial_subclass_datetime_2)
+        self.assertNotEqual(initial_datetime_2, initial_subclass_datetime_2)
 
-        self.assertKeyNotInCache(expected_cache_keys[0])
-        for key in expected_cache_keys[1:]:
-            self.assertExpectedKeyInCache(key)
+        # Stale results are retrieved from the cache instead of calling utc_now() again
+        self.assertEqual(Incrementer.get_datetime(1), initial_datetime_1)
+        self.assertEqual(Incrementer.get_datetime(2), initial_datetime_2)
+        self.assertEqual(SubclassIncrementer.get_datetime(1), initial_subclass_datetime_1)
+        self.assertEqual(SubclassIncrementer.get_datetime(2), initial_subclass_datetime_2)
+
+    def test_cached_static_methods_with_same_name_unimplemented_subclass(self):
+        """
+        Tests that
+        """
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.get_datetime(1)
+        initial_datetime_2 = Incrementer.get_datetime(2)
+        self.assertNotEqual(initial_datetime_1, initial_datetime_2)
+
+        # Stale results since the subclass has not implemented its own class_increment_by method
+        initial_subclass_datetime_1 = UnimplementedSubclassIncrementer.get_datetime(1)
+        initial_subclass_datetime_2 = UnimplementedSubclassIncrementer.get_datetime(2)
+        self.assertEqual(initial_datetime_1, initial_subclass_datetime_1)
+        self.assertEqual(initial_datetime_2, initial_subclass_datetime_2)
+
+        # Stale results are retrieved from the cache instead of calling utc_now() again
+        self.assertEqual(Incrementer.get_datetime(1), initial_datetime_1)
+        self.assertEqual(Incrementer.get_datetime(2), initial_datetime_2)
+        self.assertEqual(UnimplementedSubclassIncrementer.get_datetime(1), initial_datetime_1)
+        self.assertEqual(UnimplementedSubclassIncrementer.get_datetime(2), initial_datetime_2)
+
+    def test_cached_static_method_with_same_name_different_class(self):
+        """
+        Tests that
+        """
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.get_datetime(1)
+        initial_datetime_2 = Incrementer.get_datetime(2)
+        self.assertNotEqual(initial_datetime_1, initial_datetime_2)
+
+        # Hasn't been computed before, so the function actually gets called
+        initial_another_datetime_1 = AnotherIncrementer.get_datetime(1)
+        initial_another_datetime_2 = AnotherIncrementer.get_datetime(2)
+        self.assertNotEqual(initial_another_datetime_1, initial_another_datetime_2)
+        self.assertNotEqual(initial_datetime_1, initial_another_datetime_2)
+        self.assertNotEqual(initial_datetime_2, initial_another_datetime_2)
+
+        # Stale results are retrieved from the cache instead of calling utc_now() again
+        self.assertEqual(Incrementer.get_datetime(1), initial_datetime_1)
+        self.assertEqual(Incrementer.get_datetime(2), initial_datetime_2)
+        self.assertEqual(AnotherIncrementer.get_datetime(1), initial_another_datetime_1)
+        self.assertEqual(AnotherIncrementer.get_datetime(2), initial_another_datetime_2)
+
+    def test_invalidate_static_method(self):
+        """
+        Tests that invalidate works on an class method
+        """
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.get_datetime(1)
+        initial_datetime_2 = Incrementer.get_datetime(2)
+        self.assertNotEqual(initial_datetime_1, initial_datetime_2)
+
+        # Stale results are retrieved from the cache instead of calling inner_func() again
+        cached_datetime_1 = Incrementer.get_datetime(1)
+        cached_datetime_2 = Incrementer.get_datetime(2)
+        self.assertEqual(initial_datetime_1, cached_datetime_1)
+        self.assertEqual(initial_datetime_2, cached_datetime_2)
+
+        # Invalidate 1
+        Incrementer.get_datetime.invalidate(1)
+
+        # 1 gets recomputed
+        self.assertNotEqual(Incrementer.get_datetime(1), initial_datetime_1)
+
+        # but 2 is still stale
+        self.assertEqual(Incrementer.get_datetime(2), initial_datetime_2)
+
+
+class CacheHelperCacheableTests(TestCase):
+
+    def tearDown(self):
+        super().tearDown()
+        cache.clear()
+
+    def test_cache_helper_cacheable_on_instance_method(self):
+        obj_1 = EqualIfSumIsEqual(3, 7)  # sum=10
+        obj_2 = EqualIfSumIsEqual(4, 6)  # sum=10
+
+        # sum=10 hasn't been an arg before, so the product gets computed
+        self.assertEqual(obj_1.get_product(), 21)
+
+        # obj_1 and obj_2 are considered the same because their sums are equal.
+        # So this returns cached value of 21 rather than recomputing get_product and getting 24
+        self.assertEqual(obj_2.get_product(), 21)
+
+        # obj_3 has a different sum than obj_1 so get_product gets computed correctly
+        obj_3 = EqualIfSumIsEqual(4, 7)
+        self.assertEqual(obj_3.get_product(), 28)
+
+    def test_cache_helper_cacheable_on_static_method_as_arg(self):
+        """
+        Tests that calling a cached class method with the same arguments uses the cached values.
+        """
+        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
+        obj_2 = EqualIfSumIsEqual(1, 2)  # sum = 3
+        obj_3 = EqualIfSumIsEqual(2, 2)  # sum = 4
+
+        # sum=4 gets computed for the first time
+        initial_datetime_1 = Incrementer.get_datetime(obj_1)
+
+        # sum=3 gets computed for the first time
+        initial_datetime_2 = Incrementer.get_datetime(obj_2)
+        self.assertNotEqual(initial_datetime_1, initial_datetime_2)
+
+        # Since obj_1 and obj_3 are considered the same, we get the cached value
+        self.assertEqual(Incrementer.get_datetime(obj_3), initial_datetime_1)
+
+    def test_cache_helper_cacheable_on_static_method_as_kwarg(self):
+        """
+        Tests that calling a cached class method with the same arguments uses the cached values.
+        """
+        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
+        obj_2 = EqualIfSumIsEqual(1, 2)  # sum = 3
+        obj_3 = EqualIfSumIsEqual(2, 2)  # sum = 4
+
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.get_datetime(0, useless_kwarg=obj_1)
+        initial_datetime_2 = Incrementer.get_datetime(0, useless_kwarg=obj_2)
+        self.assertNotEqual(initial_datetime_1, initial_datetime_2)
+
+        # Since obj_1 and obj_3 are considered the same, we get the cached value
+        self.assertEqual(Incrementer.get_datetime(0, useless_kwarg=obj_3), initial_datetime_1)
+
+    def test_arg_order_matters(self):
+        """
+        Tests that calling a cached class method with the same arguments uses the cached values.
+        """
+        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
+        obj_2 = EqualIfSumIsEqual(2, 2)  # sum = 4
+
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_1=obj_1)
+        initial_datetime_2 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_1=obj_2)
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+
+        swapped_arg_datetme = Incrementer.func_with_multiple_args_and_kwargs('a', 0, kwarg_1=obj_1)
+
+        # Since obj_1 and obj_3 are considered the same, we get the cached value
+        self.assertNotEqual(initial_datetime_1, swapped_arg_datetme)
+
+    def test_kwarg_order_does_not_matter(self):
+        """
+        Tests that calling a cached class method with the same arguments uses the cached values.
+        """
+        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
+
+        # Hasn't been computed before, so the function actually gets called
+        initial_datetime_1 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_1=obj_1, kwarg_2='hmm')
+        initial_datetime_2 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_2='hmm', kwarg_1=obj_1)
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
