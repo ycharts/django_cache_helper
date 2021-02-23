@@ -9,7 +9,7 @@ from cache_helper import settings
 from cache_helper.decorators import cached, cached_class_method, cached_instance_method
 from cache_helper.interfaces import CacheHelperCacheable
 from cache_helper.utils import get_hashed_cache_key, get_function_cache_key
-from cache_helper.exceptions import CacheKeyCreationError, CacheHelperFunctionError
+from cache_helper.exceptions import CacheKeyCreationError
 
 
 @cached(60*60)

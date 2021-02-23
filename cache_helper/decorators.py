@@ -62,7 +62,7 @@ def cached_class_method(timeout):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # skip the first qarg because it will be the class itself
+            # skip the first arg because it will be the class itself
             function_cache_key = utils. get_function_cache_key(func_name, args[1:], kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
@@ -141,6 +141,7 @@ def cached_instance_method(timeout):
             cache.delete(cache_key)
 
         def create_cache_key(self, *args, **kwargs):
+            # Need to include the first arg (self) in the cache key
             func_name = utils.get_function_name(self.func)
             function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
