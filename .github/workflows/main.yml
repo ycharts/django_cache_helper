@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ 3.4, 3.5, 3.6, 3.7 ]
-        django-version: [ 1.7.x, 1.8.x, 1.9.x, 1.10.x, 1.11.x, 2.0.x, 2.1.x, 2.2.x, 3.0.x, 3.1.x ]
+        django-version: [ 1.7.x, 1.8.x, 1.9.x, 1.10.x, 1.11.x, 2.0.x, 2.1.x, 2.2.x, 3.0.x ]
         exclude:
           - python-version: 3.4
             django-version: 2.1.x
@@ -26,14 +26,10 @@ jobs:
             django-version: 2.2.x
           - python-version: 3.4
             django-version: 3.0.x
-          - python-version: 3.4
-            django-version: 3.1.x
           - python-version: 3.5
             django-version: 1.7.x
           - python-version: 3.5
             django-version: 3.0.x
-          - python-version: 3.5
-            django-version: 3.1.x
           - python-version: 3.6
             django-version: 1.7.x
           - python-version: 3.7
