@@ -4,7 +4,7 @@ from cache_helper.interfaces import CacheHelperCacheable
 
 
 def get_function_cache_key(func_name, func_args, func_kwargs):
-    args_string = _sanitize_args(*func_args, **func_kwargs)
+    args_string = build_args_string(*func_args, **func_kwargs)
     key = '{func_name}{args_string}'.format(func_name=func_name, args_string=args_string)
     return key
 
@@ -18,10 +18,15 @@ def get_hashed_cache_key(key):
     return key_hash
 
 
-def _sanitize_args(*args, **kwargs):
+def build_args_string(*args, **kwargs):
     """
-    Creates unicode key from all kwargs/args
-        -Note: comma separate args in order to prevent foo(1,2), foo(12, None) corner-case collisions...
+    Deterministically builds a string from the args and kwargs. If any of the args or kwargs are an instance
+    of `CacheHelperCacheable`, `get_cache_helper_key` will be called to help build the string.
+
+    We used to iterate down the kwargs to handle the case where a CacheHelperCacheable may be deeply nested
+    within the kwargs. However we are now using a simpler solution that only checks if the top-most level
+    args and kwargs are `CacheHelperCacheable`. Update this function if you run into a scenario where this
+    simple solution is insufficient for your needs.
     """
     key = ";{args_key};{kwargs_key}"
     args_key = tuple(_get_object_cache_key(obj) for obj in args)
