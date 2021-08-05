@@ -62,8 +62,7 @@ class SubclassIncrementer(Incrementer):
 
 
 class UnimplementedSubclassIncrementer(Incrementer):
-    def __init__(self, instance_counter):
-        super().__init__(instance_counter)
+    pass
 
 
 class AnotherIncrementer:
@@ -89,7 +88,12 @@ class AnotherIncrementer:
         return datetime.utcnow()
 
 
-class EqualIfSumIsEqual(CacheHelperCacheable):
+class CacheableIfSumsAreEqual(CacheHelperCacheable):
+    """
+    The product of 2 numbers is not guaranteed to be equal if their sums are equal.
+    This is a contrived example to test `get_cache_helper_key`
+    """
+
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -124,7 +128,7 @@ class CachedInstanceMethodTests(TestCase):
 
     def test_cached_instance_method_with_two_instances_of_same_class(self):
         """
-        Tests that
+        Tests that two instances of the same class do not clash.
         """
         incrementer_1 = Incrementer(100)
         incrementer_2 = Incrementer(200)
@@ -145,7 +149,7 @@ class CachedInstanceMethodTests(TestCase):
 
     def test_cached_instance_methods_with_same_name_subclass(self):
         """
-        Tests that
+        Tests that two instances, one of which is a subclass of the other, do not clash.
         """
         incrementer_1 = Incrementer(100)
         incrementer_2 = SubclassIncrementer(100)
@@ -166,7 +170,7 @@ class CachedInstanceMethodTests(TestCase):
 
     def test_cached_instance_methods_with_same_name_unimplemented_subclass(self):
         """
-        Tests that
+        Tests that two instances, one of which is an unimplemented subclass of the other, do not clash.
         """
         incrementer_1 = Incrementer(100)
         incrementer_2 = UnimplementedSubclassIncrementer(100)
@@ -182,12 +186,12 @@ class CachedInstanceMethodTests(TestCase):
         # Stale results for both incrementers now
         self.assertEqual(incrementer_1.instance_increment_by(1), 101)
         self.assertEqual(incrementer_1.instance_increment_by(2), 103)
-        self.assertEqual(incrementer_2.instance_increment_by(1), 103)
         self.assertEqual(incrementer_2.instance_increment_by(2), 102)
+        self.assertEqual(incrementer_2.instance_increment_by(1), 103)
 
     def test_cached_instance_method_with_same_name_different_class(self):
         """
-        Tests that
+        Tests that two instances of different classes with the same method name do not clash.
         """
         incrementer_1 = Incrementer(100)
         incrementer_2 = AnotherIncrementer(100)
@@ -247,16 +251,30 @@ class CachedClassMethodTests(TestCase):
         Tests that calling a cached class method with the same arguments uses the cached values.
         """
         # Hasn't been computed before, so the function actually gets called
-        Incrementer.class_increment_by(1)
-        Incrementer.class_increment_by(2)
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
 
-        # Stale results are retrieved from the cache instead of calling increment() again
-        Incrementer.class_increment_by(1)
-        Incrementer.class_increment_by(2)
+        # Stale results are retrieved from the cache instead of calling class_increment_by again
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+
+    def test_cached_class_method_from_instance_and_class(self):
+        """
+        Tests that it does not matter if you call the class method through an instance or the class itself.
+        """
+        incrementer_instance = Incrementer(100)
+
+        # Hasn't been computed before, so the function actually gets called
+        self.assertEqual(incrementer_instance.class_increment_by(1), 501)
+        self.assertEqual(Incrementer.class_increment_by(2), 503)
+
+        # Stale results are retrieved from the cache instead of calling class_increment_by again
+        self.assertEqual(Incrementer.class_increment_by(1), 501)
+        self.assertEqual(incrementer_instance.class_increment_by(2), 503)
 
     def test_cached_class_methods_with_same_name_subclass(self):
         """
-        Tests that
+        Tests that two instances, one of which is a subclass of the other, do not clash.
         """
         # Hasn't been computed before, so the function actually gets called
         self.assertEqual(Incrementer.class_increment_by(1), 501)
@@ -274,7 +292,7 @@ class CachedClassMethodTests(TestCase):
 
     def test_cached_class_methods_with_same_name_unimplemented_subclass(self):
         """
-        Tests that
+        Tests that two instances, one of which is an unimplemented subclass of the other, do not clash.
         """
         # Hasn't been computed before, so the function actually gets called
         self.assertEqual(Incrementer.class_increment_by(1), 501)
@@ -292,7 +310,7 @@ class CachedClassMethodTests(TestCase):
 
     def test_cached_class_method_with_same_name_different_class(self):
         """
-        Tests that
+        Tests that two instances of different classes with the same method name do not clash.
         """
         # Hasn't been computed before, so the function actually gets called
         self.assertEqual(Incrementer.class_increment_by(1), 501)
@@ -338,7 +356,7 @@ class CachedStaticMethodTests(TestCase):
 
     def test_cached_static_method_basic(self):
         """
-        Tests that calling a cached class method with the same arguments uses the cached values.
+        Tests that calling a cached static method with the same arguments uses the cached values.
         """
         # Hasn't been computed before, so the function actually gets called
         initial_datetime_1 = Incrementer.get_datetime(1)
@@ -353,7 +371,7 @@ class CachedStaticMethodTests(TestCase):
 
     def test_cached_static_methods_with_same_name_subclass(self):
         """
-        Tests that
+        Tests that a subclass with a different implementation of the cached method does not clash.
         """
         # Hasn't been computed before, so the function actually gets called
         initial_datetime_1 = Incrementer.get_datetime(1)
@@ -375,7 +393,7 @@ class CachedStaticMethodTests(TestCase):
 
     def test_cached_static_methods_with_same_name_unimplemented_subclass(self):
         """
-        Tests that
+        Tests that a subclass with the same implementation of the cached method does not clash.
         """
         # Hasn't been computed before, so the function actually gets called
         initial_datetime_1 = Incrementer.get_datetime(1)
@@ -396,7 +414,7 @@ class CachedStaticMethodTests(TestCase):
 
     def test_cached_static_method_with_same_name_different_class(self):
         """
-        Tests that
+        Tests two classes with the same static method name do not clash.
         """
         # Hasn't been computed before, so the function actually gets called
         initial_datetime_1 = Incrementer.get_datetime(1)
@@ -448,8 +466,8 @@ class CacheHelperCacheableTests(TestCase):
         cache.clear()
 
     def test_cache_helper_cacheable_on_instance_method(self):
-        obj_1 = EqualIfSumIsEqual(3, 7)  # sum=10
-        obj_2 = EqualIfSumIsEqual(4, 6)  # sum=10
+        obj_1 = CacheableIfSumsAreEqual(3, 7)  # sum=10
+        obj_2 = CacheableIfSumsAreEqual(4, 6)  # sum=10
 
         # sum=10 hasn't been an arg before, so the product gets computed
         self.assertEqual(obj_1.get_product(), 21)
@@ -459,16 +477,16 @@ class CacheHelperCacheableTests(TestCase):
         self.assertEqual(obj_2.get_product(), 21)
 
         # obj_3 has a different sum than obj_1 so get_product gets computed correctly
-        obj_3 = EqualIfSumIsEqual(4, 7)
+        obj_3 = CacheableIfSumsAreEqual(4, 7)
         self.assertEqual(obj_3.get_product(), 28)
 
     def test_cache_helper_cacheable_on_static_method_as_arg(self):
         """
         Tests that calling a cached class method with the same arguments uses the cached values.
         """
-        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
-        obj_2 = EqualIfSumIsEqual(1, 2)  # sum = 3
-        obj_3 = EqualIfSumIsEqual(2, 2)  # sum = 4
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
 
         # sum=4 gets computed for the first time
         initial_datetime_1 = Incrementer.get_datetime(obj_1)
@@ -484,9 +502,9 @@ class CacheHelperCacheableTests(TestCase):
         """
         Tests that calling a cached class method with the same arguments uses the cached values.
         """
-        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
-        obj_2 = EqualIfSumIsEqual(1, 2)  # sum = 3
-        obj_3 = EqualIfSumIsEqual(2, 2)  # sum = 4
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
 
         # Hasn't been computed before, so the function actually gets called
         initial_datetime_1 = Incrementer.get_datetime(0, useless_kwarg=obj_1)
@@ -500,8 +518,8 @@ class CacheHelperCacheableTests(TestCase):
         """
         Tests that calling a cached class method with the same arguments uses the cached values.
         """
-        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
-        obj_2 = EqualIfSumIsEqual(2, 2)  # sum = 4
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
 
         # Hasn't been computed before, so the function actually gets called
         initial_datetime_1 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_1=obj_1)
@@ -517,7 +535,7 @@ class CacheHelperCacheableTests(TestCase):
         """
         Tests that calling a cached class method with the same arguments uses the cached values.
         """
-        obj_1 = EqualIfSumIsEqual(1, 3)  # sum = 4
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
 
         # Hasn't been computed before, so the function actually gets called
         initial_datetime_1 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_1=obj_1, kwarg_2='hmm')

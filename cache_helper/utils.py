@@ -1,7 +1,5 @@
 from hashlib import sha256
 
-from cache_helper import settings
-from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
 
