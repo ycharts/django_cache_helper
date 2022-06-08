@@ -1,12 +1,10 @@
 from hashlib import sha256
 
-from cache_helper import settings
-from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
 
 def get_function_cache_key(func_name, func_args, func_kwargs):
-    args_string = _sanitize_args(*func_args, **func_kwargs)
+    args_string = build_args_string(*func_args, **func_kwargs)
     key = '{func_name}{args_string}'.format(func_name=func_name, args_string=args_string)
     return key
 
@@ -20,97 +18,27 @@ def get_hashed_cache_key(key):
     return key_hash
 
 
-def _sanitize_args(*args, **kwargs):
+def build_args_string(*args, **kwargs):
     """
-    Creates unicode key from all kwargs/args
-        -Note: comma separate args in order to prevent foo(1,2), foo(12, None) corner-case collisions...
+    Deterministically builds a string from the args and kwargs. If any of the args or kwargs are an instance
+    of `CacheHelperCacheable`, `get_cache_helper_key` will be called to help build the string.
+
+    We used to iterate down the kwargs to handle the case where a CacheHelperCacheable may be deeply nested
+    within the kwargs. However we are now using a simpler solution that only checks if the top-most level
+    args and kwargs are `CacheHelperCacheable`. Update this function if you run into a scenario where this
+    simple solution is insufficient for your needs.
     """
     key = ";{args_key};{kwargs_key}"
-    args_key = _plumb_collections(args)
-    kwargs_key = _plumb_collections(kwargs)
+    args_key = tuple(_get_object_cache_key(obj) for obj in args)
+    kwargs_key = ''
+    for (k, v) in sorted(kwargs.items()):
+        kwargs_key += str(k) + ':' + _get_object_cache_key(v)
+
     return key.format(args_key=args_key, kwargs_key=kwargs_key)
 
 
 def get_function_name(func):
     return '{func_module}.{qualified_name}'.format(func_module=func.__module__, qualified_name=func.__qualname__)
-
-
-def _plumb_collections(input_item):
-    """
-    Rather than enforce a list input type, place ALL input
-    in our state list.
-    """
-    level = 0
-    return_list = []
-    # really just want to make sure we start off with a list of iterators, so enforce here
-    if hasattr(input_item, '__iter__'):
-        if isinstance(input_item, dict):
-            # Py3k Compatibility nonsense...
-            remains = [[(k, v) for k, v in input_item.items()].__iter__()]
-            # because dictionary iterators yield tuples, it would appear
-            # to be 2 levels per dictionary, but that seems unexpected.
-            level -= 1
-        else:
-            remains = [input_item.__iter__()]
-    else:
-        return _get_object_cache_key(input_item)
-
-    while len(remains) > 0:
-        if settings.MAX_DEPTH is not None and level > settings.MAX_DEPTH:
-            raise CacheKeyCreationError(
-                'Function args or kwargs have too many nested collections for current MAX_DEPTH')
-        current_iterator = remains.pop()
-        level += 1
-        while True:
-            try:
-                current_item = next(current_iterator)
-            except StopIteration:
-                level -= 1
-                break
-            # In py3k hasattr(str, '__iter__')  => True but in python 2 it's False which will break
-            # this if statement. That's why we do `not isinstance(current_item, str)` check as well.
-            if hasattr(current_item, '__iter__') and not isinstance(current_item, str):
-                return_list.append(',')
-
-                # Dictionaries and sets are unordered and can be of various data types
-                # We use the sha256 hash on keys and sort to be deterministic
-                if isinstance(current_item, dict):
-                    hashed_list = []
-
-                    for k, v in current_item.items():
-                        item_cache_key = _get_object_cache_key(k)
-                        hashed_list.append((sha256(item_cache_key.encode('utf-8')).hexdigest(), v))
-
-                    hashed_list = sorted(hashed_list, key=lambda t: t[0])
-                    remains.append(current_iterator)
-                    remains.append(hashed_list.__iter__())
-
-                    level -= 1
-                    break
-                elif isinstance(current_item, set):
-                    hashed_list = []
-
-                    for item in current_item:
-                        item_cache_key = _get_object_cache_key(item)
-                        hashed_list.append(sha256(item_cache_key.encode('utf-8')).hexdigest())
-
-                    hashed_list = sorted(hashed_list)
-                    remains.append(current_iterator)
-                    remains.append(hashed_list.__iter__())
-                    break
-                else:
-                    remains.append(current_iterator)
-                    remains.append(current_item.__iter__())
-                    break
-            else:
-                current_item_string = '{0},'.format(_get_object_cache_key(current_item))
-                return_list.append(current_item_string)
-                continue
-    # trim trailing comma
-    return_string = ''.join(return_list)
-    # trim last ',' because it lacks significant meaning.
-    return return_string[:-1]
-
 
 def _get_object_cache_key(obj):
     """
