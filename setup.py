@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='django-cache-helper',
-    version='0.4.0',
+    version='1.0.0',
     description='Helps cache stuff',
     author='YCharts',
     author_email='operator@ycharts.com',
