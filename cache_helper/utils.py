@@ -1,5 +1,7 @@
 from hashlib import sha256
 
+from cache_helper import settings
+from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
 
@@ -28,13 +30,10 @@ def build_args_string(*args, **kwargs):
     args and kwargs are `CacheHelperCacheable`. Update this function if you run into a scenario where this
     simple solution is insufficient for your needs.
     """
-    key = ";{args_key};{kwargs_key}"
-    args_key = tuple(_get_object_cache_key(obj) for obj in args)
-    kwargs_key = ''
-    for (k, v) in sorted(kwargs.items()):
-        kwargs_key += str(k) + ':' + _get_object_cache_key(v)
+    args_key = build_cache_key_using_dfs(args)
+    kwargs_key = build_cache_key_using_dfs(kwargs)
 
-    return key.format(args_key=args_key, kwargs_key=kwargs_key)
+    return f';{args_key};{kwargs_key}'
 
 
 def get_function_name(func):
@@ -51,3 +50,53 @@ def _get_object_cache_key(obj):
         return obj.get_cache_helper_key()
     else:
         return str(obj)
+
+def build_cache_key_using_dfs(input_item):
+    """
+    Iterates down a tree of collections (e.g. a list of dicts), and uses the elements to build a deterministic cache key
+
+    :param input_item: args or kwargs
+    :return: A deterministic cache key
+    """
+    def _get_deterministic_iterable(iterable, _depth):
+        """
+        Helper function for the DFS that takes an iterable and sorts it deterministically. This is necessary so that
+        equivalent dicts / sets are guaranteed to be cached using the same key
+
+        :param iterable: The input iterable, potentially unordered
+        :param _depth: The current depth of the DFS
+
+        :return: A deterministically sorted iterable, containing tuples of elements and their depths
+        :rtype: list[tuple[any, int]]
+        """
+        if isinstance(iterable, dict):
+            sorted_dict = sorted(iterable.items())
+            # Don't increase _depth since we are breaking the dict into tuples
+            deterministic_iterable = [(item, _depth) for item in sorted_dict]
+        elif isinstance(iterable, set):
+            sorted_set = sorted(
+                list(iterable),
+                key=lambda x: sha256(_get_object_cache_key(x).encode('utf-8')).hexdigest()
+            )
+            deterministic_iterable = [(item, _depth + 1) for item in sorted_set]
+        else:
+            deterministic_iterable = [(item, _depth + 1) for item in iterable]
+
+        return deterministic_iterable
+
+    return_string = ''
+    stack = [item for item in _get_deterministic_iterable(input_item, 0)]
+
+    while stack:
+        current_item, depth = stack.pop()
+        if settings.MAX_DEPTH is not None and depth > settings.MAX_DEPTH:
+            raise CacheKeyCreationError(f'Function args / kwargs have too many nested collections'
+                                        f' for MAX_DEPTH {settings.MAX_DEPTH}')
+
+        if hasattr(current_item, '__iter__') and not isinstance(current_item, str):
+            return_string += ','
+            stack.extend(_get_deterministic_iterable(current_item, depth))
+        else:
+            return_string += f'_get_object_cache_key(current_item)'
+
+    return return_string
