@@ -61,7 +61,7 @@ def build_cache_key_using_dfs(input_item):
     def _get_deterministic_iterable(iterable, _depth):
         """
         Helper function for the DFS that takes an iterable and sorts it deterministically. This is necessary so that
-        equivalent dicts / sets are guaranteed to be cached using the same key
+        equivalent dicts / sets are guaranteed to be mapped to the same cache key
 
         :param iterable: The input iterable, potentially unordered
         :param _depth: The current depth of the DFS
@@ -85,7 +85,8 @@ def build_cache_key_using_dfs(input_item):
         return deterministic_iterable
 
     return_string = ''
-    stack = [item for item in _get_deterministic_iterable(input_item, 0)]
+    # Start the depth at -1 because args come in as a tuple and kwargs come in as a dict
+    stack = [item for item in _get_deterministic_iterable(input_item, -1)]
 
     while stack:
         current_item, depth = stack.pop()
@@ -97,6 +98,6 @@ def build_cache_key_using_dfs(input_item):
             return_string += ','
             stack.extend(_get_deterministic_iterable(current_item, depth))
         else:
-            return_string += f'_get_object_cache_key(current_item)'
+            return_string += f'{_get_object_cache_key(current_item)},'
 
     return return_string
