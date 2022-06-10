@@ -10,7 +10,6 @@ def get_function_cache_key(func_name, func_args, func_kwargs):
     key = '{func_name}{args_string}'.format(func_name=func_name, args_string=args_string)
     return key
 
-
 def get_hashed_cache_key(key):
     """
     Given the intermediate key produced by a function call along with its args + kwargs,
@@ -18,7 +17,6 @@ def get_hashed_cache_key(key):
     """
     key_hash = sha256(key.encode('utf-8', errors='ignore')).hexdigest()
     return key_hash
-
 
 def build_args_string(*args, **kwargs):
     """
@@ -34,7 +32,6 @@ def build_args_string(*args, **kwargs):
     kwargs_key = build_cache_key_using_dfs(kwargs)
 
     return f';{args_key};{kwargs_key}'
-
 
 def get_function_name(func):
     return '{func_module}.{qualified_name}'.format(func_module=func.__module__, qualified_name=func.__qualname__)
@@ -58,35 +55,9 @@ def build_cache_key_using_dfs(input_item):
     :param input_item: args or kwargs
     :return: A deterministic cache key
     """
-    def _get_deterministic_iterable(iterable, _depth):
-        """
-        Helper function for the DFS that takes an iterable and sorts it deterministically. This is necessary so that
-        equivalent dicts / sets are guaranteed to be mapped to the same cache key
-
-        :param iterable: The input iterable, potentially unordered
-        :param _depth: The current depth of the DFS
-
-        :return: A deterministically sorted iterable, containing tuples of elements and their depths
-        :rtype: list[tuple[any, int]]
-        """
-        if isinstance(iterable, dict):
-            sorted_dict = sorted(iterable.items())
-            # Don't increase _depth since we are breaking the dict into tuples
-            deterministic_iterable = [(item, _depth) for item in sorted_dict]
-        elif isinstance(iterable, set):
-            sorted_set = sorted(
-                list(iterable),
-                key=lambda x: sha256(_get_object_cache_key(x).encode('utf-8')).hexdigest()
-            )
-            deterministic_iterable = [(item, _depth + 1) for item in sorted_set]
-        else:
-            deterministic_iterable = [(item, _depth + 1) for item in iterable]
-
-        return deterministic_iterable
-
     return_string = ''
     # Start the depth at -1 because args come in as a tuple and kwargs come in as a dict
-    stack = [item for item in _get_deterministic_iterable(input_item, -1)]
+    stack = [item_and_depth for item_and_depth in _get_deterministic_iterable(input_item, -1)]
 
     while stack:
         current_item, depth = stack.pop()
@@ -101,3 +72,33 @@ def build_cache_key_using_dfs(input_item):
             return_string += f'{_get_object_cache_key(current_item)},'
 
     return return_string
+
+def _get_deterministic_iterable(iterable, _depth):
+    """
+    Helper function for the DFS that takes an iterable and organizes it deterministically. This is necessary so that
+    equivalent dicts / sets are guaranteed to be mapped to the same cache key.
+    This method also takes in and returns the current depth of the iterable in the DFS.
+
+    :param iterable: The input iterable, potentially unordered
+    :param _depth: The current depth of the DFS
+
+    :return: A deterministically sorted iterable, containing tuples of elements and their depths
+    :rtype: list[tuple[any, int]]
+    """
+    if isinstance(iterable, dict):
+        sorted_dict = sorted(
+            iterable.items(),
+            key=lambda x: sha256(_get_object_cache_key(x[0]).encode('utf-8')).hexdigest()
+        )
+        # Don't increase _depth since we are breaking the dict into tuples
+        deterministic_iterable = [(item, _depth) for item in sorted_dict]
+    elif isinstance(iterable, set):
+        sorted_set = sorted(
+            list(iterable),
+            key=lambda x: sha256(_get_object_cache_key(x).encode('utf-8')).hexdigest()
+        )
+        deterministic_iterable = [(item, _depth + 1) for item in sorted_set]
+    else:
+        deterministic_iterable = [(item, _depth + 1) for item in iterable]
+
+    return deterministic_iterable
