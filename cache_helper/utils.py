@@ -20,13 +20,9 @@ def get_hashed_cache_key(key):
 
 def build_args_string(*args, **kwargs):
     """
-    Deterministically builds a string from the args and kwargs. If any of the args or kwargs are an instance
-    of `CacheHelperCacheable`, `get_cache_helper_key` will be called to help build the string.
-
-    We used to iterate down the kwargs to handle the case where a CacheHelperCacheable may be deeply nested
-    within the kwargs. However we are now using a simpler solution that only checks if the top-most level
-    args and kwargs are `CacheHelperCacheable`. Update this function if you run into a scenario where this
-    simple solution is insufficient for your needs.
+    Deterministically builds a string from the args and kwargs. Checks if an instance
+    of `CacheHelperCacheable` is nested anywhere within the args and kwargs, and gets
+    the proper cache key if so.
     """
     args_key = build_cache_key_using_dfs(args)
     kwargs_key = build_cache_key_using_dfs(kwargs)
