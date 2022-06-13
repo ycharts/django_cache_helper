@@ -31,7 +31,7 @@ def build_args_string(*args, **kwargs):
     args_key = build_cache_key_using_dfs(args)
     kwargs_key = build_cache_key_using_dfs(kwargs)
 
-    return f';{args_key};{kwargs_key}'
+    return ';{args_key};{kwargs_key}'.format(args_key=args_key, kwargs_key=kwargs_key)
 
 def get_function_name(func):
     return '{func_module}.{qualified_name}'.format(func_module=func.__module__, qualified_name=func.__qualname__)
@@ -62,14 +62,14 @@ def build_cache_key_using_dfs(input_item):
     while stack:
         current_item, depth = stack.pop()
         if settings.MAX_DEPTH is not None and depth > settings.MAX_DEPTH:
-            raise CacheKeyCreationError(f'Function args / kwargs have too many nested collections'
-                                        f' for MAX_DEPTH {settings.MAX_DEPTH}')
+            raise CacheKeyCreationError('Function args / kwargs have too many nested collections'
+                                        ' for MAX_DEPTH {max_depth}'.format(max_depth=settings.MAX_DEPTH))
 
         if hasattr(current_item, '__iter__') and not isinstance(current_item, str):
             return_string += ','
             stack.extend(_get_deterministic_iterable(current_item, depth))
         else:
-            return_string += f'{_get_object_cache_key(current_item)},'
+            return_string += '{},'.format(_get_object_cache_key(current_item))
 
     return return_string
 
