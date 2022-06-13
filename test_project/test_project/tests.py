@@ -712,6 +712,10 @@ class CacheHelperCacheableTests(TestCase):
 
 class MaxDepthTests(TestCase):
 
+    def tearDown(self):
+        super().tearDown()
+        cache.clear()
+
     @patch('cache_helper.settings.MAX_DEPTH', 2)
     def test_max_depth_on_list_args_success(self):
         """
