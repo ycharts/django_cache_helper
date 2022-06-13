@@ -1,9 +1,10 @@
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.core.cache import cache
 
 from cache_helper.decorators import cached, cached_class_method, cached_instance_method
+from cache_helper.exceptions import CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
 from datetime import datetime
@@ -541,3 +542,282 @@ class CacheHelperCacheableTests(TestCase):
         initial_datetime_1 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_1=obj_1, kwarg_2='hmm')
         initial_datetime_2 = Incrementer.func_with_multiple_args_and_kwargs(0, 'a', kwarg_2='hmm', kwarg_1=obj_1)
         self.assertEqual(initial_datetime_1, initial_datetime_2)
+
+    def test_list_of_cacheable_args(self):
+        """
+        Tests that an arg containing a list of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime([obj_1, obj_2, obj_3])
+        initial_datetime_2 = Incrementer.get_datetime([obj_3, obj_2, obj_1])
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+
+        # Test that order matters
+        initial_datetime_3 = Incrementer.get_datetime([obj_2, obj_1, obj_3])
+        self.assertNotEqual(initial_datetime_1, initial_datetime_3)
+
+        # Test that num elements matters
+        initial_datetime_4 = Incrementer.get_datetime([obj_2, obj_1])
+        self.assertNotEqual(initial_datetime_1, initial_datetime_4)
+
+    def test_tuple_of_cacheable_args(self):
+        """
+        Tests that an arg containing a tuple of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime((obj_1, obj_2, obj_3))
+        initial_datetime_2 = Incrementer.get_datetime((obj_3, obj_2, obj_1))
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+
+        # Test that order matters
+        initial_datetime_3 = Incrementer.get_datetime((obj_2, obj_1, obj_3))
+        self.assertNotEqual(initial_datetime_1, initial_datetime_3)
+
+        # Test that num elements matters
+        initial_datetime_4 = Incrementer.get_datetime((obj_2, obj_1))
+        self.assertNotEqual(initial_datetime_1, initial_datetime_4)
+
+    def test_set_of_cacheable_args(self):
+        """
+        Tests that an arg containing a set of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime({obj_1, obj_2})
+        initial_datetime_2 = Incrementer.get_datetime({obj_2, obj_1})
+        initial_datetime_3 = Incrementer.get_datetime({obj_2, obj_3})
+        initial_datetime_4 = Incrementer.get_datetime({obj_3, obj_2})
+
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+        self.assertEqual(initial_datetime_1, initial_datetime_3)
+        self.assertEqual(initial_datetime_1, initial_datetime_4)
+
+        # Test that num elements matters
+        initial_datetime_5 = Incrementer.get_datetime({obj_2, obj_1, obj_3})
+        self.assertNotEqual(initial_datetime_1, initial_datetime_5)
+
+    def test_dict_of_cacheable_args(self):
+        """
+        Tests that an arg containing a dict of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime({1: obj_1, 2: obj_2})
+        initial_datetime_2 = Incrementer.get_datetime({2: obj_2, 1: obj_1})
+        initial_datetime_3 = Incrementer.get_datetime({2: obj_2, 1: obj_3})
+        initial_datetime_4 = Incrementer.get_datetime({1: obj_3, 2: obj_2})
+
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+        self.assertEqual(initial_datetime_1, initial_datetime_3)
+        self.assertEqual(initial_datetime_1, initial_datetime_4)
+
+        # Test that num elements matters
+        initial_datetime_5 = Incrementer.get_datetime({1: obj_3, 2: obj_2, 3: obj_1})
+        self.assertNotEqual(initial_datetime_1, initial_datetime_5)
+
+    def test_list_of_cacheable_kwargs(self):
+        """
+        Tests that a kwarg containing a list of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime(None, useless_kwarg=[obj_1, obj_2, obj_3])
+        initial_datetime_2 = Incrementer.get_datetime(None, useless_kwarg=[obj_3, obj_2, obj_1])
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+
+        # Test that order matters
+        initial_datetime_3 = Incrementer.get_datetime(None, useless_kwarg=[obj_2, obj_1, obj_3])
+        self.assertNotEqual(initial_datetime_1, initial_datetime_3)
+
+        # Test that num elements matters
+        initial_datetime_4 = Incrementer.get_datetime(None, useless_kwarg=[obj_2, obj_1])
+        self.assertNotEqual(initial_datetime_1, initial_datetime_4)
+
+    def test_tuple_of_cacheable_kwargs(self):
+        """
+        Tests that a kwarg containing a tuple of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime(None, useless_kwarg=(obj_1, obj_2, obj_3))
+        initial_datetime_2 = Incrementer.get_datetime(None, useless_kwarg=(obj_3, obj_2, obj_1))
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+
+        # Test that order matters
+        initial_datetime_3 = Incrementer.get_datetime(None, useless_kwarg=(obj_2, obj_1, obj_3))
+        self.assertNotEqual(initial_datetime_1, initial_datetime_3)
+
+        # Test that num elements matters
+        initial_datetime_4 = Incrementer.get_datetime(None, useless_kwarg=(obj_2, obj_1))
+        self.assertNotEqual(initial_datetime_1, initial_datetime_4)
+
+    def test_set_of_cacheable_kwargs(self):
+        """
+        Tests that a kwarg containing a set of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime(None, useless_kwarg={obj_1, obj_2})
+        initial_datetime_2 = Incrementer.get_datetime(None, useless_kwarg={obj_2, obj_1})
+        initial_datetime_3 = Incrementer.get_datetime(None, useless_kwarg={obj_2, obj_3})
+        initial_datetime_4 = Incrementer.get_datetime(None, useless_kwarg={obj_3, obj_2})
+
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+        self.assertEqual(initial_datetime_1, initial_datetime_3)
+        self.assertEqual(initial_datetime_1, initial_datetime_4)
+
+        # Test that num elements matters
+        initial_datetime_5 = Incrementer.get_datetime(None, useless_kwarg={obj_2, obj_1, obj_3})
+        self.assertNotEqual(initial_datetime_1, initial_datetime_5)
+
+    def test_dict_of_cacheable_kwargs(self):
+        """
+        Tests that a kwarg containing a dict of CacheHelperCacheables will cache properly.
+        """
+        obj_1 = CacheableIfSumsAreEqual(1, 3)  # sum = 4
+        obj_2 = CacheableIfSumsAreEqual(1, 2)  # sum = 3
+        obj_3 = CacheableIfSumsAreEqual(2, 2)  # sum = 4
+
+        initial_datetime_1 = Incrementer.get_datetime(None, useless_kwarg={1: obj_1, 2: obj_2})
+        initial_datetime_2 = Incrementer.get_datetime(None, useless_kwarg={2: obj_2, 1: obj_1})
+        initial_datetime_3 = Incrementer.get_datetime(None, useless_kwarg={2: obj_2, 1: obj_3})
+        initial_datetime_4 = Incrementer.get_datetime(None, useless_kwarg={1: obj_3, 2: obj_2})
+
+        self.assertEqual(initial_datetime_1, initial_datetime_2)
+        self.assertEqual(initial_datetime_1, initial_datetime_3)
+        self.assertEqual(initial_datetime_1, initial_datetime_4)
+
+        # Test that num elements matters
+        initial_datetime_5 = Incrementer.get_datetime(None, useless_kwarg={1: obj_3, 2: obj_2, 3: obj_1})
+        self.assertNotEqual(initial_datetime_1, initial_datetime_5)
+
+
+class MaxDepthTests(TestCase):
+
+    def tearDown(self):
+        super().tearDown()
+        cache.clear()
+
+    @patch('cache_helper.settings.MAX_DEPTH', 2)
+    def test_max_depth_on_list_args_success(self):
+        """
+        Tests that a list arg with the max depth does not fail.
+        """
+        Incrementer.get_datetime([1, [2, 3]])
+        Incrementer.get_datetime([1, (2, 3)])
+        Incrementer.get_datetime([1, {2, 3}])
+        Incrementer.get_datetime([1, {2: 3}])
+        Incrementer.get_datetime([1, [2, 3], (2, 3), {2, 3}, {2: 3}])
+
+    @patch('cache_helper.settings.MAX_DEPTH', 2)
+    def test_max_depth_on_list_args_failure(self):
+        """
+        Tests that a list arg past the max depth fails.
+        """
+        with self.assertRaises(CacheKeyCreationError):
+            Incrementer.get_datetime([[1, [2, [3]]]])
+
+        with self.assertRaises(CacheKeyCreationError):
+            Incrementer.get_datetime([1, {2: [3, 4]}])
+
+        with self.assertRaises(CacheKeyCreationError):
+            Incrementer.get_datetime([1, {2: (3, 4)}])
+
+    @patch('cache_helper.settings.MAX_DEPTH', 2)
+    def test_max_depth_on_dict_args_success(self):
+        """
+        Tests that a dict arg with the max depth does not fail.
+        """
+        # Top level dict without errors
+        Incrementer.get_datetime({1: [2, 3]})
+        Incrementer.get_datetime({1: (2, 3)})
+        Incrementer.get_datetime({1: {2, 3}})
+        Incrementer.get_datetime({1: {2: 3}})
+        Incrementer.get_datetime({1: {2: 3}, 4: [5, 6], 7: {8, 9}, 10: (11, 12)})
+
+    @patch('cache_helper.settings.MAX_DEPTH', 2)
+    def test_max_depth_on_dict_args_failure(self):
+        """
+        Tests that a dict arg past the max depth fails.
+        """
+        with self.assertRaises(CacheKeyCreationError):
+            Incrementer.get_datetime({1: [{2: 3}]})
+
+        with self.assertRaises(CacheKeyCreationError):
+            Incrementer.get_datetime({1: {2: [3, 4]}})
+
+        with self.assertRaises(CacheKeyCreationError):
+            Incrementer.get_datetime({1: {2: {3: 4}}})
+
+    @patch('cache_helper.settings.MAX_DEPTH', 4)
+    def test_complex_object(self):
+        complex_obj = {
+            'depth_2': [
+                'depth_3',
+                {
+                    'depth_4': [None, CacheableIfSumsAreEqual(3, 5)]
+                },
+                CacheableIfSumsAreEqual(1, 3),
+            ],
+            'another': CacheableIfSumsAreEqual(4, 6),
+        }
+
+        equivalent_obj = {
+            'another': CacheableIfSumsAreEqual(10, 0),
+            'depth_2': [
+                'depth_3',
+                {
+                    'depth_4': [None, CacheableIfSumsAreEqual(8, 0)]
+                },
+                CacheableIfSumsAreEqual(4, 0),
+            ],
+        }
+
+        different_cacheable_obj = {
+            'depth_2': [
+                'depth_3',
+                {
+                    'depth_4': [None, CacheableIfSumsAreEqual(3, 5)]
+                },
+                CacheableIfSumsAreEqual(1, 3),
+            ],
+            'another': CacheableIfSumsAreEqual(2, 12),  # Sum does not equal 10
+        }
+
+        different_structure_obj = {
+            'depth_2': [
+                'depth_3',
+                CacheableIfSumsAreEqual(1, 3),
+                {
+                    'depth_4': [None, CacheableIfSumsAreEqual(3, 5)]
+                },
+            ],
+            'another': CacheableIfSumsAreEqual(4, 6),
+        }
+
+        complex_datetime = Incrementer.get_datetime(complex_obj)
+        equivalent_datetime = Incrementer.get_datetime(equivalent_obj)
+        different_cacheable_datetime = Incrementer.get_datetime(different_cacheable_obj)
+        different_structure_datetime = Incrementer.get_datetime(different_structure_obj)
+
+        self.assertEqual(complex_datetime, equivalent_datetime)
+        self.assertNotEqual(complex_datetime, different_cacheable_datetime)
+        self.assertNotEqual(complex_datetime, different_structure_datetime)
