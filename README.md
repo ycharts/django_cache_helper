@@ -10,7 +10,16 @@ django-cache-helper
 django-cache-helper is a simple tool for making caching functions, methods, and class methods a little bit easier.
 It is largely based off of django-cache-utils, however, since cache-utils did not support caching model methods by instance and carried other features I didn't need, django-cache-helper was created.
 
-In order to cache a function/method/class_method/static_method:
+In order to cache and invalidate a function/method/class_method/static_method:
+
+## Support
+
+| Python | Django |
+|--------|--------|
+|  3.7, 3.8, 3.9, 3.10      | 3.2    |
+
+
+#### How to Cache
 
 ```python
 # Caching a function
@@ -31,13 +40,27 @@ class Incrementer:
 
     @staticmethod
     @cached(60 * 60)
-    def get_datetime(num):
-        return num
+    def get_datetime():
+        return datetime.utcnow()
 ```
-## Support
-**Python:** 3.7, 3.8, 3.9, 3.10
 
-**Django:** 3.2
+#### How to invalidate a cache
+
+```python
+
+foo(1)
+foo.invalidate(1)
+
+Incrementer.instance_increment_by(1)
+Incrementer.instance_increment_by.invalidate(1)
+
+Incrementer.class_increment_by(1)
+Incrementer.class_increment_by.invalidate(1)
+
+Incrementer.get_datetime()
+Incrementer.get_datetime.invalidate()
+```
+
 
 ## Contributors ✨
 
