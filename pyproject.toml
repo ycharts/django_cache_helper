@@ -7,7 +7,7 @@ name = "django-cache-helper"
 authors = [
     { name="YCharts", email="developers@ycharts.com" },
 ]
-description = "A redis-backed autocompleter for Django projects."
+description = "a simple tool for making caching functions, methods, and class methods a little bit easier."
 readme = "README.md"
 requires-python = ">=3.7"
 keywords = [
