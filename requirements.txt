@@ -1,1 +1,12 @@
-Django >= 1.7,<4.0
+# Used for Test Project
+Django>= 3.2, <4.0
+
+# Used for tests coverage
+coverage
+
+# Used for development
+pre-commit
+
+# User for pypi
+build
+twine

@@ -7,3 +7,7 @@
 *.un~
 .idea
 build/
+*.egg-info
+.coverage
+**/htmlcov/**
+dist/*
