@@ -10,8 +10,8 @@ from django.utils.functional import wraps
 
 from cache_helper import utils
 
-def cached(timeout):
 
+def cached(timeout):
     def _cached(func):
         func_name = utils.get_function_name(func)
 
@@ -57,14 +57,15 @@ def cached(timeout):
 
 
 def cached_class_method(timeout):
-
     def _cached(func):
         func_name = utils.get_function_name(func)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
             # skip the first arg because it will be the class itself
-            function_cache_key = utils.get_function_cache_key(func_name, args[1:], kwargs)
+            function_cache_key = utils.get_function_cache_key(
+                func_name, args[1:], kwargs
+            )
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
