@@ -2,7 +2,7 @@ django-cache-helper
 ===================
 
 &nbsp;
-![PyPI]()
+![PyPI](https://img.shields.io/pypi/v/django-cache-helper?color=green)
 [![Test Suite](https://github.com/ycharts/django_cache_helper/actions/workflows/main.yml/badge.svg?branch=master)](https://github.com/ycharts/django_cache_helper/actions/workflows/main.yml)
 [![Coverage Status](https://coveralls.io/repos/github/ycharts/django_cache_helper/badge.svg?branch=master)](https://coveralls.io/github/ycharts/django_cache_helper?branch=master)
 
