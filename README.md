@@ -14,9 +14,9 @@ In order to cache and invalidate a function/method/class_method/static_method:
 
 ## Support
 
-| Python | Django |
-|--------|--------|
-|  3.7, 3.8, 3.9, 3.10      | 3.2    |
+| Python |
+|--------|
+|  3.7, 3.8, 3.9, 3.10      |
 
 
 #### How to Cache
