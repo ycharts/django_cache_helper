@@ -26,6 +26,10 @@ def cached(timeout):
             try:
                 value = cache.get(cache_key)
             except Exception:
+                logger.warning(
+                    f'Error retrieving value from Cache for Key: {function_cache_key}',
+                    exc_info=True,
+                )
                 value = None
 
             if value is None:
@@ -38,7 +42,7 @@ def cached(timeout):
 
                 except CacheSetError:
                     logger.warning(
-                        f'Error saving value to Cache for Key: {cache_key}',
+                        f'Error saving value to Cache for Key: {function_cache_key}',
                         exc_info=True,
                     )
 
@@ -77,6 +81,10 @@ def cached_class_method(timeout):
             try:
                 value = cache.get(cache_key)
             except Exception:
+                logger.warning(
+                    f'Error retrieving value from Cache for Key: {function_cache_key}',
+                    exc_info=True,
+                )
                 value = None
 
             if value is None:
@@ -88,7 +96,7 @@ def cached_class_method(timeout):
                     cache.set(cache_key, value, timeout)
                 except CacheSetError:
                     logger.warning(
-                        f'Error saving value to Cache for Key: {cache_key}',
+                        f'Error saving value to Cache for Key: {function_cache_key}',
                         exc_info=True,
                     )
 
@@ -141,10 +149,14 @@ def cached_instance_method(timeout):
             return fn
 
         def __call__(self, *args, **kwargs):
-            cache_key = self.create_cache_key(*args, **kwargs)
+            cache_key, function_cache_key = self.create_cache_key(*args, **kwargs)
             try:
                 value = cache.get(cache_key)
             except Exception:
+                logger.warning(
+                    f'Error retrieving value from Cache for Key: {function_cache_key}',
+                    exc_info=True,
+                )
                 value = None
             if value is None:
                 value = self.func(*args, **kwargs)
@@ -155,7 +167,7 @@ def cached_instance_method(timeout):
                     cache.set(cache_key, value, timeout)
                 except CacheSetError:
                     logger.warning(
-                        f'Error saving value to Cache for Key: {cache_key}',
+                        f'Error saving value to Cache for Key: {function_cache_key}',
                         exc_info=True,
                     )
             return value
@@ -168,7 +180,7 @@ def cached_instance_method(timeout):
             :param kwargs: The kwargs passed into the original function.
             :rtype: None
             """
-            cache_key = self.create_cache_key(*args, **kwargs)
+            cache_key, _ = self.create_cache_key(*args, **kwargs)
             cache.delete(cache_key)
 
         def create_cache_key(self, *args, **kwargs):
@@ -176,6 +188,6 @@ def cached_instance_method(timeout):
             func_name = utils.get_function_name(self.func)
             function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
-            return cache_key
+            return cache_key, function_cache_key
 
     return wrapper
