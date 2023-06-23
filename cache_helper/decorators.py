@@ -1,3 +1,5 @@
+import logging
+
 try:
     from _pylibmc import Error as CacheSetError
 except ImportError:
@@ -10,6 +12,7 @@ from django.utils.functional import wraps
 
 from cache_helper import utils
 
+logger = logging.getLogger(__name__)
 
 def cached(timeout):
     def _cached(func):
@@ -34,7 +37,10 @@ def cached(timeout):
                     cache.set(cache_key, value, timeout)
 
                 except CacheSetError:
-                    pass
+                    logger.warning(
+                        f'Error saving value to Cache for Key: {cache_key}',
+                        exc_info=True,
+                    )
 
             return value
 
@@ -81,7 +87,10 @@ def cached_class_method(timeout):
                 try:
                     cache.set(cache_key, value, timeout)
                 except CacheSetError:
-                    pass
+                    logger.warning(
+                        f'Error saving value to Cache for Key: {cache_key}',
+                        exc_info=True,
+                    )
 
             return value
 
@@ -145,7 +154,10 @@ def cached_instance_method(timeout):
                 try:
                     cache.set(cache_key, value, timeout)
                 except CacheSetError:
-                    pass
+                    logger.warning(
+                        f'Error saving value to Cache for Key: {cache_key}',
+                        exc_info=True,
+                    )
             return value
 
         def _invalidate(self, *args, **kwargs):
