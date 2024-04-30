@@ -1,5 +1,5 @@
 # Used for Test Project
-Django>= 3.2, <4.0
+Django>= 4.2, <5.0
 
 # Used for tests coverage
 coverage
