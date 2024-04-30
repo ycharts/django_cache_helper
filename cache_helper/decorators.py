@@ -26,6 +26,8 @@ def cached(timeout):
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
+                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
+                # key does not exist due to expiry or never being set.
                 value = cache.get(cache_key, CACHE_KEY_NOT_FOUND)
             except Exception:
                 logger.warning(
@@ -80,6 +82,8 @@ def cached_class_method(timeout):
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
+                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
+                # key does not exist due to expiry or never being set.
                 value = cache.get(cache_key, CACHE_KEY_NOT_FOUND)
             except Exception:
                 logger.warning(
@@ -151,7 +155,10 @@ def cached_instance_method(timeout):
 
         def __call__(self, *args, **kwargs):
             cache_key, function_cache_key = self.create_cache_key(*args, **kwargs)
+
             try:
+                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
+                # key does not exist due to expiry or never being set.
                 value = cache.get(cache_key, CACHE_KEY_NOT_FOUND)
             except Exception:
                 logger.warning(
