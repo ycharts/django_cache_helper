@@ -113,7 +113,7 @@ def cached_class_method(timeout):
             :param kwargs: The kwargs passed into the original function.
             :rtype: None
             """
-            function_cache_key = utils.get_function_cache_key(func_name, args[1:], kwargs)
+            function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
             cache.delete(cache_key)
 
