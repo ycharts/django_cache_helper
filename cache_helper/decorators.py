@@ -24,10 +24,10 @@ def cached(timeout):
             function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
+            # We need to determine whether the object exists in the cache, and since we may have stored a literal value
+            # None, use a sentinel object as the default
             sentinel = object()
             try:
-                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
-                # key does not exist due to expiry or never being set.
                 value = cache.get(cache_key, sentinel)
             except Exception:
                 logger.warning(
@@ -79,10 +79,10 @@ def cached_class_method(timeout):
             function_cache_key = utils.get_function_cache_key(func_name, args[1:], kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
+            # We need to determine whether the object exists in the cache, and since we may have stored a literal value
+            # None, use a sentinel object as the default
             sentinel = object()
             try:
-                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
-                # key does not exist due to expiry or never being set.
                 value = cache.get(cache_key, sentinel)
             except Exception:
                 logger.warning(
@@ -155,10 +155,10 @@ def cached_instance_method(timeout):
         def __call__(self, *args, **kwargs):
             cache_key, function_cache_key = self.create_cache_key(*args, **kwargs)
 
+            # We need to determine whether the object exists in the cache, and since we may have stored a literal value
+            # None, use a sentinel object as the default
             sentinel = object()
             try:
-                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
-                # key does not exist due to expiry or never being set.
                 value = cache.get(cache_key, sentinel)
             except Exception:
                 logger.warning(
