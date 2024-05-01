@@ -9,6 +9,8 @@ from cache_helper.interfaces import CacheHelperCacheable
 
 from datetime import datetime
 
+GLOBAL_COUNTER = 200
+
 
 class Incrementer:
     class_counter = 500
@@ -38,6 +40,25 @@ class Incrementer:
             arg_1, arg_2, kwarg_1=None, kwarg_2="a string"
     ):
         return datetime.utcnow()
+
+    @cached_instance_method(60 * 60)
+    def instance_increment_by_none_return(self, num):
+        self.instance_counter += num
+        return None
+
+    @classmethod
+    @cached_class_method(60 * 60)
+    def class_increment_by_none_return(cls, num):
+        cls.class_counter += num
+        return None
+
+    @staticmethod
+    @cached(60 * 60)
+    def static_increment_by_none_return(num):
+        global GLOBAL_COUNTER
+        GLOBAL_COUNTER += num
+
+        return None
 
 
 class SubclassIncrementer(Incrementer):
@@ -268,6 +289,26 @@ class CachedInstanceMethodTests(TestCase):
         # but 2 is still stale
         self.assertEqual(incrementer.instance_increment_by(2), 103)
 
+    def test_cached_instance_method_none_return(self):
+        """
+        Tests that calling a cached instance method returning None still uses the cache as expected.
+        """
+        incrementer = Incrementer(100)
+
+        # Hasn't been computed before, so the function actually gets called
+        incrementer.instance_increment_by_none_return(1)
+        self.assertEqual(incrementer.instance_counter, 101)
+
+        incrementer.instance_increment_by_none_return(2)
+        self.assertEqual(incrementer.instance_counter, 103)
+
+        # We expect the instance counter to stay the same as the last time it was updated and not increment again
+        incrementer.instance_increment_by_none_return(1)
+        self.assertEqual(incrementer.instance_counter, 103)
+
+        incrementer.instance_increment_by_none_return(2)
+        self.assertEqual(incrementer.instance_counter, 103)
+
 
 class CachedClassMethodTests(TestCase):
     def tearDown(self):
@@ -410,10 +451,31 @@ class CachedClassMethodTests(TestCase):
         # but 2 is still stale
         self.assertEqual(Incrementer.class_increment_by(2), 503)
 
+    def test_cached_class_method_none_return(self):
+        """
+        Tests that calling a cached class method returning None still uses the cache as expected.
+        """
+        # Hasn't been computed before, so the function actually gets called
+        Incrementer.class_increment_by_none_return(1)
+        self.assertEqual(Incrementer.class_counter, 501)
+
+        Incrementer.class_increment_by_none_return(2)
+        self.assertEqual(Incrementer.class_counter, 503)
+
+        # We expect the class counter to stay the same as the last time it was updated and not increment again
+        Incrementer.class_increment_by_none_return(1)
+        self.assertEqual(Incrementer.class_counter, 503)
+
+        Incrementer.class_increment_by_none_return(2)
+        self.assertEqual(Incrementer.class_counter, 503)
+
 
 class CachedStaticMethodTests(TestCase):
     def tearDown(self):
         super().tearDown()
+
+        global GLOBAL_COUNTER
+        GLOBAL_COUNTER = 200
         cache.clear()
 
     def test_exception_during_cache_retrieval(self):
@@ -548,6 +610,24 @@ class CachedStaticMethodTests(TestCase):
 
         # but 2 is still stale
         self.assertEqual(Incrementer.get_datetime(2), initial_datetime_2)
+
+    def test_cached_class_method_none_return(self):
+        """
+        Tests that calling a cached static method returning None still uses the cache as expected.
+        """
+        # Hasn't been computed before, so the function actually gets called
+        Incrementer.static_increment_by_none_return(1)
+        self.assertEqual(GLOBAL_COUNTER, 201)
+
+        Incrementer.static_increment_by_none_return(2)
+        self.assertEqual(GLOBAL_COUNTER, 203)
+
+        # We expect the global counter to stay the same as the last time it was updated and not increment again
+        Incrementer.static_increment_by_none_return(1)
+        self.assertEqual(GLOBAL_COUNTER, 203)
+
+        Incrementer.static_increment_by_none_return(2)
+        self.assertEqual(GLOBAL_COUNTER, 203)
 
 
 class CacheHelperCacheableTests(TestCase):

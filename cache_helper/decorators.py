@@ -13,6 +13,8 @@ from django.utils.functional import wraps
 from cache_helper import utils
 
 logger = logging.getLogger(__name__)
+CACHE_KEY_NOT_FOUND = 'cache_key_not_found'
+
 
 def cached(timeout):
     def _cached(func):
@@ -24,22 +26,23 @@ def cached(timeout):
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
-                value = cache.get(cache_key)
+                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
+                # key does not exist due to expiry or never being set.
+                value = cache.get(cache_key, CACHE_KEY_NOT_FOUND)
             except Exception:
                 logger.warning(
                     f'Error retrieving value from Cache for Key: {function_cache_key}',
                     exc_info=True,
                 )
-                value = None
+                value = CACHE_KEY_NOT_FOUND
 
-            if value is None:
+            if value == CACHE_KEY_NOT_FOUND:
                 value = func(*args, **kwargs)
                 # Try and set the key, value pair in the cache.
                 # But if it fails on an error from the underlying
                 # cache system, handle it.
                 try:
                     cache.set(cache_key, value, timeout)
-
                 except CacheSetError:
                     logger.warning(
                         f'Error saving value to Cache for Key: {function_cache_key}',
@@ -73,21 +76,21 @@ def cached_class_method(timeout):
         @wraps(func)
         def wrapper(*args, **kwargs):
             # skip the first arg because it will be the class itself
-            function_cache_key = utils.get_function_cache_key(
-                func_name, args[1:], kwargs
-            )
+            function_cache_key = utils.get_function_cache_key(func_name, args[1:], kwargs)
             cache_key = utils.get_hashed_cache_key(function_cache_key)
 
             try:
-                value = cache.get(cache_key)
+                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
+                # key does not exist due to expiry or never being set.
+                value = cache.get(cache_key, CACHE_KEY_NOT_FOUND)
             except Exception:
                 logger.warning(
                     f'Error retrieving value from Cache for Key: {function_cache_key}',
                     exc_info=True,
                 )
-                value = None
+                value = CACHE_KEY_NOT_FOUND
 
-            if value is None:
+            if value == CACHE_KEY_NOT_FOUND:
                 value = func(*args, **kwargs)
                 # Try and set the key, value pair in the cache.
                 # But if it fails on an error from the underlying
@@ -150,15 +153,19 @@ def cached_instance_method(timeout):
 
         def __call__(self, *args, **kwargs):
             cache_key, function_cache_key = self.create_cache_key(*args, **kwargs)
+
             try:
-                value = cache.get(cache_key)
+                # Attempts to get cache key and defaults to a string constant which will be returned if the cache
+                # key does not exist due to expiry or never being set.
+                value = cache.get(cache_key, CACHE_KEY_NOT_FOUND)
             except Exception:
                 logger.warning(
                     f'Error retrieving value from Cache for Key: {function_cache_key}',
                     exc_info=True,
                 )
-                value = None
-            if value is None:
+                value = CACHE_KEY_NOT_FOUND
+
+            if value == CACHE_KEY_NOT_FOUND:
                 value = self.func(*args, **kwargs)
                 # Try and set the key, value pair in the cache.
                 # But if it fails on an error from the underlying
@@ -170,6 +177,7 @@ def cached_instance_method(timeout):
                         f'Error saving value to Cache for Key: {function_cache_key}',
                         exc_info=True,
                     )
+
             return value
 
         def _invalidate(self, *args, **kwargs):
