@@ -36,7 +36,16 @@ def cached(timeout):
                 )
                 value = sentinel
 
-            if value is sentinel:
+            # If there is an issue with our cache client deserializing the value (due to memory or some other issue),
+            # we get a None response so log anytime this happens
+            if value is None:
+                logger.warning(
+                    'None cache value found for cache key: {}, function cache key: {}, value: {}'.format(
+                        cache_key, function_cache_key, value
+                    )
+                )
+
+            if value is sentinel or value is None:
                 value = func(*args, **kwargs)
                 # Try and set the key, value pair in the cache.
                 # But if it fails on an error from the underlying
@@ -91,7 +100,16 @@ def cached_class_method(timeout):
                 )
                 value = sentinel
 
-            if value is sentinel:
+            # If there is an issue with our cache client deserializing the value (due to memory or some other issue),
+            # we get a None response so log anytime this happens
+            if value is None:
+                logger.warning(
+                    'None cache value found for cache key: {}, function cache key: {}, value: {}'.format(
+                        cache_key, function_cache_key, value
+                    )
+                )
+
+            if value is sentinel or value is None:
                 value = func(*args, **kwargs)
                 # Try and set the key, value pair in the cache.
                 # But if it fails on an error from the underlying
@@ -167,7 +185,16 @@ def cached_instance_method(timeout):
                 )
                 value = sentinel
 
-            if value is sentinel:
+            # If there is an issue with our cache client deserializing the value (due to memory or some other issue),
+            # we get a None response so log anytime this happens
+            if value is None:
+                logger.warning(
+                    'None cache value found for cache key: {}, function cache key: {}, value: {}'.format(
+                        cache_key, function_cache_key, value
+                    )
+                )
+
+            if value is sentinel or value is None:
                 value = self.func(*args, **kwargs)
                 # Try and set the key, value pair in the cache.
                 # But if it fails on an error from the underlying
