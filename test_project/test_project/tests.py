@@ -28,6 +28,12 @@ class Incrementer:
         cls.class_counter += num
         return cls.class_counter
 
+    @classmethod
+    @cached_class_method(60 * 60)
+    def class_increment_by_with_kwargs(cls, num, useless_kwarg=None):
+        cls.class_counter += num
+        return cls.class_counter
+
     @staticmethod
     @cached(60 * 60)
     def get_datetime(useless_arg, useless_kwarg=None):
@@ -397,7 +403,6 @@ class CachedClassMethodTests(TestCase):
         # Hasn't been computed before, so the function actually gets called
         self.assertEqual(Incrementer.class_increment_by(1), 501)
         self.assertEqual(Incrementer.class_increment_by(2), 503)
-
         # Stale results are retrieved from the cache instead of calling increment() again
         self.assertEqual(Incrementer.class_increment_by(1), 501)
         self.assertEqual(Incrementer.class_increment_by(2), 503)
@@ -411,6 +416,37 @@ class CachedClassMethodTests(TestCase):
         # but 2 is still stale
         self.assertEqual(Incrementer.class_increment_by(2), 503)
 
+
+    def test_cache_key_consistency_mismatched_args_kwargs(self):
+        # 0 0 / 0 0
+        inc_1 = Incrementer.class_increment_by_with_kwargs(1, datetime(2025, 4, 28))
+        inc_2 = Incrementer.class_increment_by_with_kwargs(1, datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 0 / 0 1
+        inc_1 = Incrementer.class_increment_by_with_kwargs(2, datetime(2025, 4, 28))
+        inc_2 = Incrementer.class_increment_by_with_kwargs(2, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 0 / 1 1
+        inc_1 = Incrementer.class_increment_by_with_kwargs(3, datetime(2025, 4, 28))
+        inc_2 = Incrementer.class_increment_by_with_kwargs(num=3, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 1 / 0 1
+        inc_1 = Incrementer.class_increment_by_with_kwargs(4, useless_kwarg=datetime(2025, 4, 28))
+        inc_2 = Incrementer.class_increment_by_with_kwargs(4, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 1 / 1 1
+        inc_1 = Incrementer.class_increment_by_with_kwargs(5, useless_kwarg=datetime(2025, 4, 28))
+        inc_2 = Incrementer.class_increment_by_with_kwargs(num=5, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 1 1  / 1 1
+        inc_1 = Incrementer.class_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
+        inc_2 = Incrementer.class_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
 
 class CachedStaticMethodTests(TestCase):
     def tearDown(self):

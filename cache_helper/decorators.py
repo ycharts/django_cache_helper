@@ -15,6 +15,7 @@ from cache_helper import utils
 
 logger = logging.getLogger(__name__)
 
+
 def _get_function_cache_key(func_name, func_signature, args, kwargs):
     bound_arguments = func_signature.bind(*args, **kwargs)
     function_cache_key = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
@@ -75,8 +76,7 @@ def cached(timeout):
             :param kwargs: The kwargs passed into the original function.
             :rtype: None
             """
-            function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
-            cache_key = utils.get_hashed_cache_key(function_cache_key)
+            _, cache_key = _get_function_cache_key(func_name, func_signature, args, kwargs)
             cache.delete(cache_key)
 
         wrapper.invalidate = invalidate
@@ -88,13 +88,15 @@ def cached(timeout):
 def cached_class_method(timeout):
     def _cached(func):
         func_name = utils.get_function_name(func)
+        func_signature = inspect.signature(func)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # skip the first arg because it will be the class itself
-            function_cache_key = utils.get_function_cache_key(func_name, args[1:], kwargs)
-            cache_key = utils.get_hashed_cache_key(function_cache_key)
-
+            # replace the first arg for caching purposes because it will be the class itself
+            cls_adjusted_args = (None, *args[1:])
+            function_cache_key, cache_key = _get_function_cache_key(
+                func_name, func_signature, cls_adjusted_args, kwargs
+            )
             # We need to determine whether the object exists in the cache, and since we may have stored a literal value
             # None, use a sentinel object as the default
             sentinel = object()
@@ -134,13 +136,16 @@ def cached_class_method(timeout):
         def invalidate(*args, **kwargs):
             """
             A method to invalidate a result from the cache.
-            :param args: The args passed into the original function. This includes `self` for instance methods, and
+            :param args: The args passed into the original function. This excludes `self` for instance methods, and
             `cls` for class methods.
             :param kwargs: The kwargs passed into the original function.
             :rtype: None
             """
-            function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
-            cache_key = utils.get_hashed_cache_key(function_cache_key)
+            # note: args does not include the class itself, but because it *is* passed to wrapper() and we replaced
+            # it with None for consistent cache behavior with subclasses, we need to account for it here by updating
+            # args to include None
+            cls_adjusted_args = (None, *args)
+            _, cache_key = _get_function_cache_key(func_name, func_signature, cls_adjusted_args, kwargs)
             cache.delete(cache_key)
 
         wrapper.invalidate = invalidate
