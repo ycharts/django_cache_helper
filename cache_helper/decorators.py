@@ -1,3 +1,4 @@
+import inspect
 import logging
 
 try:
@@ -14,15 +15,21 @@ from cache_helper import utils
 
 logger = logging.getLogger(__name__)
 
+def _get_function_cache_key(func_name, func_signature, args, kwargs):
+    bound_arguments = func_signature.bind(*args, **kwargs)
+    function_cache_key = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
+    hashed_function_cache_key = utils.get_hashed_cache_key(function_cache_key)
+    return function_cache_key, hashed_function_cache_key
+
 
 def cached(timeout):
     def _cached(func):
         func_name = utils.get_function_name(func)
+        func_signature = inspect.signature(func)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
-            cache_key = utils.get_hashed_cache_key(function_cache_key)
+            function_cache_key, cache_key = _get_function_cache_key(func_name, func_signature, args, kwargs)
 
             # We need to determine whether the object exists in the cache, and since we may have stored a literal value
             # None, use a sentinel object as the default

@@ -959,3 +959,14 @@ class MaxDepthTests(TestCase):
         self.assertEqual(complex_datetime, equivalent_datetime)
         self.assertNotEqual(complex_datetime, different_cacheable_datetime)
         self.assertNotEqual(complex_datetime, different_structure_datetime)
+
+class CacheKeyConsistencyTests(TestCase):
+    def tearDown(self):
+        super().tearDown()
+        cache.clear()
+
+    def test_cache_key_consistency(self):
+        dt_1 = Incrementer.get_datetime('test', useless_kwarg=datetime(2025, 4, 28))
+        dt_2 = Incrementer.get_datetime('test', datetime(2025, 4, 28))
+
+        self.assertEqual(dt_1, dt_2)
