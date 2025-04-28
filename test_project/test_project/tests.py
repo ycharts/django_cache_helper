@@ -1,13 +1,12 @@
+from datetime import datetime
 from unittest.mock import patch
 
-from django.test import TestCase
 from django.core.cache import cache
+from django.test import TestCase
 
 from cache_helper.decorators import cached, cached_class_method, cached_instance_method
 from cache_helper.exceptions import CacheHelperException, CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
-
-from datetime import datetime
 
 GLOBAL_COUNTER = 200
 
@@ -554,6 +553,37 @@ class CachedStaticMethodTests(TestCase):
         # but 2 is still stale
         self.assertEqual(Incrementer.get_datetime(2), initial_datetime_2)
 
+    def test_cache_key_consistency_mismatched_args_kwargs(self):
+        # 0 0 / 0 0
+        dt_1 = Incrementer.get_datetime('test', datetime(2025, 4, 28))
+        dt_2 = Incrementer.get_datetime('test', datetime(2025, 4, 28))
+        self.assertEqual(dt_1, dt_2)
+
+        # 0 0 / 0 1
+        dt_1 = Incrementer.get_datetime('test', datetime(2025, 4, 28))
+        dt_2 = Incrementer.get_datetime('test', useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(dt_1, dt_2)
+
+        # 0 0 / 1 1
+        dt_1 = Incrementer.get_datetime('test', datetime(2025, 4, 28))
+        dt_2 = Incrementer.get_datetime(useless_arg='test', useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(dt_1, dt_2)
+
+        # 0 1 / 0 1
+        dt_1 = Incrementer.get_datetime('test', useless_kwarg=datetime(2025, 4, 28))
+        dt_2 = Incrementer.get_datetime('test', useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(dt_1, dt_2)
+
+        # 0 1 / 1 1
+        dt_1 = Incrementer.get_datetime('test', useless_kwarg=datetime(2025, 4, 28))
+        dt_2 = Incrementer.get_datetime(useless_arg='test', useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(dt_1, dt_2)
+
+        # 1 1  / 1 1
+        dt_1 = Incrementer.get_datetime(useless_arg='test', useless_kwarg=datetime(2025, 4, 28))
+        dt_2 = Incrementer.get_datetime(useless_arg='test', useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(dt_1, dt_2)
+
 
 class CacheHelperCacheableTests(TestCase):
     def tearDown(self):
@@ -959,14 +989,3 @@ class MaxDepthTests(TestCase):
         self.assertEqual(complex_datetime, equivalent_datetime)
         self.assertNotEqual(complex_datetime, different_cacheable_datetime)
         self.assertNotEqual(complex_datetime, different_structure_datetime)
-
-class CacheKeyConsistencyTests(TestCase):
-    def tearDown(self):
-        super().tearDown()
-        cache.clear()
-
-    def test_cache_key_consistency(self):
-        dt_1 = Incrementer.get_datetime('test', useless_kwarg=datetime(2025, 4, 28))
-        dt_2 = Incrementer.get_datetime('test', datetime(2025, 4, 28))
-
-        self.assertEqual(dt_1, dt_2)
