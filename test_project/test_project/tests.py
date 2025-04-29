@@ -22,6 +22,11 @@ class Incrementer:
         self.instance_counter += num
         return self.instance_counter
 
+    @cached_instance_method(60 * 60)
+    def instance_increment_by_with_kwargs(self, num, useless_kwarg=None):
+        self.instance_counter += num
+        return self.instance_counter
+
     @classmethod
     @cached_class_method(60 * 60)
     def class_increment_by(cls, num):
@@ -275,6 +280,39 @@ class CachedInstanceMethodTests(TestCase):
         # but 2 is still stale
         self.assertEqual(incrementer.instance_increment_by(2), 103)
 
+    def test_cache_key_consistency_mismatched_instance_args(self):
+        incrementer = Incrementer(100)
+
+        # 0 0 / 0 0
+        inc_1 = incrementer.instance_increment_by_with_kwargs(1, datetime(2025, 4, 28))
+        inc_2 = incrementer.instance_increment_by_with_kwargs(1, datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 0 / 0 1
+        inc_1 = incrementer.instance_increment_by_with_kwargs(2, datetime(2025, 4, 28))
+        inc_2 = incrementer.instance_increment_by_with_kwargs(2, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 0 / 1 1
+        inc_1 = incrementer.instance_increment_by_with_kwargs(3, datetime(2025, 4, 28))
+        inc_2 = incrementer.instance_increment_by_with_kwargs(num=3, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 1 / 0 1
+        inc_1 = incrementer.instance_increment_by_with_kwargs(4, useless_kwarg=datetime(2025, 4, 28))
+        inc_2 = incrementer.instance_increment_by_with_kwargs(4, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 0 1 / 1 1
+        inc_1 = incrementer.instance_increment_by_with_kwargs(5, useless_kwarg=datetime(2025, 4, 28))
+        inc_2 = incrementer.instance_increment_by_with_kwargs(num=5, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
+        # 1 1  / 1 1
+        inc_1 = incrementer.instance_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
+        inc_2 = incrementer.instance_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(inc_1, inc_2)
+
 
 class CachedClassMethodTests(TestCase):
     def tearDown(self):
@@ -416,8 +454,7 @@ class CachedClassMethodTests(TestCase):
         # but 2 is still stale
         self.assertEqual(Incrementer.class_increment_by(2), 503)
 
-
-    def test_cache_key_consistency_mismatched_args_kwargs(self):
+    def test_cache_key_consistency_mismatched_class_args(self):
         # 0 0 / 0 0
         inc_1 = Incrementer.class_increment_by_with_kwargs(1, datetime(2025, 4, 28))
         inc_2 = Incrementer.class_increment_by_with_kwargs(1, datetime(2025, 4, 28))
@@ -447,6 +484,7 @@ class CachedClassMethodTests(TestCase):
         inc_1 = Incrementer.class_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
         inc_2 = Incrementer.class_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
         self.assertEqual(inc_1, inc_2)
+
 
 class CachedStaticMethodTests(TestCase):
     def tearDown(self):
@@ -589,7 +627,7 @@ class CachedStaticMethodTests(TestCase):
         # but 2 is still stale
         self.assertEqual(Incrementer.get_datetime(2), initial_datetime_2)
 
-    def test_cache_key_consistency_mismatched_args_kwargs(self):
+    def test_cache_key_consistency_mismatched_static_args(self):
         # 0 0 / 0 0
         dt_1 = Incrementer.get_datetime('test', datetime(2025, 4, 28))
         dt_2 = Incrementer.get_datetime('test', datetime(2025, 4, 28))

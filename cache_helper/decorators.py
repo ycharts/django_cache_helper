@@ -1,5 +1,5 @@
-import inspect
 import logging
+from inspect import Signature, signature
 
 try:
     from _pylibmc import Error as CacheSetError
@@ -16,17 +16,20 @@ from cache_helper import utils
 logger = logging.getLogger(__name__)
 
 
-def _get_function_cache_key(func_name, func_signature, args, kwargs):
+def _get_function_cache_key(func_name: str, func_signature: Signature, args: tuple, kwargs: dict) -> tuple[str, str]:
+    """
+    TODO
+    """
     bound_arguments = func_signature.bind(*args, **kwargs)
     function_cache_key = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
     hashed_function_cache_key = utils.get_hashed_cache_key(function_cache_key)
-    return function_cache_key, hashed_function_cache_key
+    return function_cache_key, hashed_function_cache_key  # TODO order here? check line 243 for consistency
 
 
 def cached(timeout):
     def _cached(func):
         func_name = utils.get_function_name(func)
-        func_signature = inspect.signature(func)
+        func_signature = signature(func)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -88,7 +91,7 @@ def cached(timeout):
 def cached_class_method(timeout):
     def _cached(func):
         func_name = utils.get_function_name(func)
-        func_signature = inspect.signature(func)
+        func_signature = signature(func)
 
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -235,8 +238,8 @@ def cached_instance_method(timeout):
         def create_cache_key(self, *args, **kwargs):
             # Need to include the first arg (self) in the cache key
             func_name = utils.get_function_name(self.func)
-            function_cache_key = utils.get_function_cache_key(func_name, args, kwargs)
-            cache_key = utils.get_hashed_cache_key(function_cache_key)
+            func_signature = signature(self.func)
+            function_cache_key, cache_key = _get_function_cache_key(func_name, func_signature, args, kwargs)
             return cache_key, function_cache_key
 
     return wrapper
