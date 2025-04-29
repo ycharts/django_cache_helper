@@ -47,7 +47,6 @@ class Incrementer:
 #### How to invalidate a cache
 
 ```python
-
 foo(1)
 foo.invalidate(1)
 
@@ -61,6 +60,30 @@ Incrementer.get_datetime()
 Incrementer.get_datetime.invalidate()
 ```
 
+#### How to run tests
+
+1. Create and activate a new Python virtual environment using the package manager of your choice (e.g., `pyenv-virtualenv`, `virtualenv`, etc.).
+
+2. Install requirements. 
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+   
+3. Install the `django_cache_helper` package in editable mode
+
+    ```bash
+    pip install -e .
+    ```
+   
+4. Run tests using `manage.py`: 
+
+    ```bash
+    cd test_project
+    python manage.py test
+    ```
+
+Note that the current test suite generates some expected warnings, which are manually suppressed in the test code. 
 
 ## Contributors ✨
 
