@@ -1,14 +1,15 @@
+import logging
+from datetime import datetime
 from unittest.mock import patch
 
-from django.test import TestCase
 from django.core.cache import cache
+from django.test import TestCase
 
 from cache_helper.decorators import cached, cached_class_method, cached_instance_method
 from cache_helper.exceptions import CacheHelperException, CacheKeyCreationError
 from cache_helper.interfaces import CacheHelperCacheable
 
-from datetime import datetime
-
+DISABLE_LOGGING_BELOW = logging.ERROR
 GLOBAL_COUNTER = 200
 
 
@@ -112,9 +113,15 @@ class CacheableIfSumsAreEqual(CacheHelperCacheable):
 
 
 class CachedInstanceMethodTests(TestCase):
+
+    def setUp(self):
+        logging.disable(DISABLE_LOGGING_BELOW)
+        super().setUp()
+
     def tearDown(self):
         super().tearDown()
         cache.clear()
+        logging.disable(logging.NOTSET)
 
     def test_exception_during_cache_retrieval(self):
         incrementer = Incrementer(100)
@@ -272,6 +279,11 @@ class CachedInstanceMethodTests(TestCase):
 
 
 class CachedClassMethodTests(TestCase):
+
+    def setUp(self):
+        logging.disable(DISABLE_LOGGING_BELOW)
+        super().setUp()
+
     def tearDown(self):
         super().tearDown()
 
@@ -281,6 +293,7 @@ class CachedClassMethodTests(TestCase):
         AnotherIncrementer.class_counter = 500
 
         cache.clear()
+        logging.disable(logging.NOTSET)
 
     def test_exception_during_cache_retrieval(self):
         # Hasn't been computed before, so the function actually gets called
@@ -414,12 +427,17 @@ class CachedClassMethodTests(TestCase):
 
 
 class CachedStaticMethodTests(TestCase):
+    def setUp(self):
+        logging.disable(DISABLE_LOGGING_BELOW)
+        super().setUp()
+
     def tearDown(self):
         super().tearDown()
 
         global GLOBAL_COUNTER
         GLOBAL_COUNTER = 200
         cache.clear()
+        logging.disable(logging.NOTSET)
 
     def test_exception_during_cache_retrieval(self):
         datetime_1 = Incrementer.get_datetime(1)
