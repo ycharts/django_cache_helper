@@ -1,5 +1,6 @@
 import logging
 from inspect import Signature, signature
+from typing import Tuple  # deprecated, but required for Python 3.8 and below
 
 try:
     from _pylibmc import Error as CacheSetError
@@ -16,14 +17,19 @@ from cache_helper import utils
 logger = logging.getLogger(__name__)
 
 
-def _get_function_cache_key(func_name: str, func_signature: Signature, args: tuple, kwargs: dict) -> tuple[str, str]:
+def _get_function_cache_keys(func_name: str, func_signature: Signature, args: tuple, kwargs: dict) -> Tuple[str, str]:
     """
-    TODO
+    Generate hashed and non-hashed function cache keys, ensuring that args and kwargs are correctly bound to function.
+
+    :param func_name: The fully specified name of the function to be cached.
+    :param func_signature: The signature of the function to be cached.
+    :param args: The positional arguments passed to the function.
+    :param kwargs: The keyword arguments passed to the function.
     """
     bound_arguments = func_signature.bind(*args, **kwargs)
     function_cache_key = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
     hashed_function_cache_key = utils.get_hashed_cache_key(function_cache_key)
-    return function_cache_key, hashed_function_cache_key  # TODO order here? check line 243 for consistency
+    return hashed_function_cache_key, function_cache_key
 
 
 def cached(timeout):
@@ -33,7 +39,7 @@ def cached(timeout):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            function_cache_key, cache_key = _get_function_cache_key(func_name, func_signature, args, kwargs)
+            cache_key, function_cache_key = _get_function_cache_keys(func_name, func_signature, args, kwargs)
 
             # We need to determine whether the object exists in the cache, and since we may have stored a literal value
             # None, use a sentinel object as the default
@@ -79,7 +85,7 @@ def cached(timeout):
             :param kwargs: The kwargs passed into the original function.
             :rtype: None
             """
-            _, cache_key = _get_function_cache_key(func_name, func_signature, args, kwargs)
+            cache_key, _ = _get_function_cache_keys(func_name, func_signature, args, kwargs)
             cache.delete(cache_key)
 
         wrapper.invalidate = invalidate
@@ -97,7 +103,7 @@ def cached_class_method(timeout):
         def wrapper(*args, **kwargs):
             # replace the first arg for caching purposes because it will be the class itself
             cls_adjusted_args = (None, *args[1:])
-            function_cache_key, cache_key = _get_function_cache_key(
+            cache_key, function_cache_key = _get_function_cache_keys(
                 func_name, func_signature, cls_adjusted_args, kwargs
             )
             # We need to determine whether the object exists in the cache, and since we may have stored a literal value
@@ -148,7 +154,7 @@ def cached_class_method(timeout):
             # it with None for consistent cache behavior with subclasses, we need to account for it here by updating
             # args to include None
             cls_adjusted_args = (None, *args)
-            _, cache_key = _get_function_cache_key(func_name, func_signature, cls_adjusted_args, kwargs)
+            cache_key, _ = _get_function_cache_keys(func_name, func_signature, cls_adjusted_args, kwargs)
             cache.delete(cache_key)
 
         wrapper.invalidate = invalidate
@@ -239,7 +245,7 @@ def cached_instance_method(timeout):
             # Need to include the first arg (self) in the cache key
             func_name = utils.get_function_name(self.func)
             func_signature = signature(self.func)
-            function_cache_key, cache_key = _get_function_cache_key(func_name, func_signature, args, kwargs)
+            cache_key, function_cache_key = _get_function_cache_keys(func_name, func_signature, args, kwargs)
             return cache_key, function_cache_key
 
     return wrapper
