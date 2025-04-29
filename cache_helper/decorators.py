@@ -25,6 +25,8 @@ def _get_function_cache_keys(func_name: str, func_signature: Signature, args: tu
     :param func_signature: The signature of the function to be cached.
     :param args: The positional arguments passed to the function.
     :param kwargs: The keyword arguments passed to the function.
+
+    :return: A tuple containing the hashed cache key and the non-hashed cache key.
     """
     bound_arguments = func_signature.bind(*args, **kwargs)
     function_cache_key = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
