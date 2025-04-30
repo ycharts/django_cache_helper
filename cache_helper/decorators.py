@@ -29,6 +29,7 @@ def _get_function_cache_keys(func_name: str, func_signature: Signature, args: tu
     :return: A tuple containing the hashed cache key and the non-hashed cache key.
     """
     bound_arguments = func_signature.bind(*args, **kwargs)
+    bound_arguments.apply_defaults()
     function_cache_key = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
     hashed_function_cache_key = utils.get_hashed_cache_key(function_cache_key)
     return hashed_function_cache_key, function_cache_key

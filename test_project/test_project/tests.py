@@ -321,6 +321,21 @@ class CachedInstanceMethodTests(TestCase):
         inc_2 = incrementer.instance_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
         self.assertEqual(inc_1, inc_2)
 
+    def test_cache_key_consistency_mismatched_instance_args_with_default(self):
+        incrementer = Incrementer(100)
+
+        inc_1 = incrementer.instance_increment_by_with_kwargs(1)
+        inc_2 = incrementer.instance_increment_by_with_kwargs(1, None)
+        self.assertEqual(inc_1, inc_2)
+
+        inc_1 = incrementer.instance_increment_by_with_kwargs(2)
+        inc_2 = incrementer.instance_increment_by_with_kwargs(2, useless_kwarg=None)
+        self.assertEqual(inc_1, inc_2)
+
+        inc_1 = incrementer.instance_increment_by_with_kwargs(3, None)
+        inc_2 = incrementer.instance_increment_by_with_kwargs(3, useless_kwarg=None)
+        self.assertEqual(inc_1, inc_2)
+
 
 class CachedClassMethodTests(TestCase):
 
@@ -499,6 +514,19 @@ class CachedClassMethodTests(TestCase):
         inc_2 = Incrementer.class_increment_by_with_kwargs(num=6, useless_kwarg=datetime(2025, 4, 28))
         self.assertEqual(inc_1, inc_2)
 
+    def test_cache_key_consistency_mismatched_class_args_with_default(self):
+        inc_1 = Incrementer.class_increment_by_with_kwargs(1)
+        inc_2 = Incrementer.class_increment_by_with_kwargs(1, None)
+        self.assertEqual(inc_1, inc_2)
+
+        inc_1 = Incrementer.class_increment_by_with_kwargs(2)
+        inc_2 = Incrementer.class_increment_by_with_kwargs(2, useless_kwarg=None)
+        self.assertEqual(inc_1, inc_2)
+
+        inc_1 = Incrementer.class_increment_by_with_kwargs(3, None)
+        inc_2 = Incrementer.class_increment_by_with_kwargs(3, useless_kwarg=None)
+        self.assertEqual(inc_1, inc_2)
+
 
 class CachedStaticMethodTests(TestCase):
     def setUp(self):
@@ -675,6 +703,19 @@ class CachedStaticMethodTests(TestCase):
         # 1 1  / 1 1
         dt_1 = Incrementer.get_datetime(useless_arg='test', useless_kwarg=datetime(2025, 4, 28))
         dt_2 = Incrementer.get_datetime(useless_arg='test', useless_kwarg=datetime(2025, 4, 28))
+        self.assertEqual(dt_1, dt_2)
+
+    def test_cache_key_consistency_mismatched_static_args_with_default(self):
+        dt_1 = Incrementer.get_datetime('test')
+        dt_2 = Incrementer.get_datetime('test', None)
+        self.assertEqual(dt_1, dt_2)
+
+        dt_1 = Incrementer.get_datetime('test')
+        dt_2 = Incrementer.get_datetime('test', useless_kwarg=None)
+        self.assertEqual(dt_1, dt_2)
+
+        dt_1 = Incrementer.get_datetime('test', None)
+        dt_2 = Incrementer.get_datetime('test', useless_kwarg=None)
         self.assertEqual(dt_1, dt_2)
 
 
