@@ -30,9 +30,9 @@ def _get_function_cache_keys(func_name: str, func_signature: Signature, args: tu
     """
     bound_arguments = func_signature.bind(*args, **kwargs)
     bound_arguments.apply_defaults()
-    function_cache_key = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
-    hashed_function_cache_key = utils.get_hashed_cache_key(function_cache_key)
-    return hashed_function_cache_key, function_cache_key
+    cache_key_string = utils.get_function_cache_key(func_name, bound_arguments.args, bound_arguments.kwargs)
+    cache_key_hashed = utils.get_hashed_cache_key(cache_key_string)
+    return cache_key_hashed, cache_key_string
 
 
 def cached(timeout):
@@ -42,16 +42,16 @@ def cached(timeout):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_key, function_cache_key = _get_function_cache_keys(func_name, func_signature, args, kwargs)
+            cache_key_hashed, cache_key_string = _get_function_cache_keys(func_name, func_signature, args, kwargs)
 
             # We need to determine whether the object exists in the cache, and since we may have stored a literal value
             # None, use a sentinel object as the default
             sentinel = object()
             try:
-                value = cache.get(cache_key, sentinel)
+                value = cache.get(cache_key_hashed, sentinel)
             except Exception:
                 logger.warning(
-                    f'Error retrieving value from Cache for Key: {function_cache_key}',
+                    f'Error retrieving value from Cache for Key: {cache_key_string}',
                     exc_info=True,
                 )
                 value = sentinel
@@ -61,7 +61,7 @@ def cached(timeout):
             if value is None:
                 logger.warning(
                     'None cache value found for cache key: {}, function cache key: {}, value: {}'.format(
-                        cache_key, function_cache_key, value
+                        cache_key_hashed, cache_key_string, value
                     )
                 )
 
@@ -71,10 +71,10 @@ def cached(timeout):
                 # But if it fails on an error from the underlying
                 # cache system, handle it.
                 try:
-                    cache.set(cache_key, value, timeout)
+                    cache.set(cache_key_hashed, value, timeout)
                 except CacheSetError:
                     logger.warning(
-                        f'Error saving value to Cache for Key: {function_cache_key}',
+                        f'Error saving value to Cache for Key: {cache_key_string}',
                         exc_info=True,
                     )
 
@@ -106,17 +106,17 @@ def cached_class_method(timeout):
         def wrapper(*args, **kwargs):
             # replace the first arg for caching purposes because it will be the class itself
             cls_adjusted_args = (None, *args[1:])
-            cache_key, function_cache_key = _get_function_cache_keys(
+            cache_key_hashed, cache_key_string = _get_function_cache_keys(
                 func_name, func_signature, cls_adjusted_args, kwargs
             )
             # We need to determine whether the object exists in the cache, and since we may have stored a literal value
             # None, use a sentinel object as the default
             sentinel = object()
             try:
-                value = cache.get(cache_key, sentinel)
+                value = cache.get(cache_key_hashed, sentinel)
             except Exception:
                 logger.warning(
-                    f'Error retrieving value from Cache for Key: {function_cache_key}',
+                    f'Error retrieving value from Cache for Key: {cache_key_string}',
                     exc_info=True,
                 )
                 value = sentinel
@@ -126,7 +126,7 @@ def cached_class_method(timeout):
             if value is None:
                 logger.warning(
                     'None cache value found for cache key: {}, function cache key: {}, value: {}'.format(
-                        cache_key, function_cache_key, value
+                        cache_key_hashed, cache_key_string, value
                     )
                 )
 
@@ -136,10 +136,10 @@ def cached_class_method(timeout):
                 # But if it fails on an error from the underlying
                 # cache system, handle it.
                 try:
-                    cache.set(cache_key, value, timeout)
+                    cache.set(cache_key_hashed, value, timeout)
                 except CacheSetError:
                     logger.warning(
-                        f'Error saving value to Cache for Key: {function_cache_key}',
+                        f'Error saving value to Cache for Key: {cache_key_string}',
                         exc_info=True,
                     )
 
@@ -195,16 +195,16 @@ def cached_instance_method(timeout):
             return fn
 
         def __call__(self, *args, **kwargs):
-            cache_key, function_cache_key = self.create_cache_key(*args, **kwargs)
+            cache_key_hashed, cache_key_string = self.create_cache_key(*args, **kwargs)
 
             # We need to determine whether the object exists in the cache, and since we may have stored a literal value
             # None, use a sentinel object as the default
             sentinel = object()
             try:
-                value = cache.get(cache_key, sentinel)
+                value = cache.get(cache_key_hashed, sentinel)
             except Exception:
                 logger.warning(
-                    f'Error retrieving value from Cache for Key: {function_cache_key}',
+                    f'Error retrieving value from Cache for Key: {cache_key_string}',
                     exc_info=True,
                 )
                 value = sentinel
@@ -214,7 +214,7 @@ def cached_instance_method(timeout):
             if value is None:
                 logger.warning(
                     'None cache value found for cache key: {}, function cache key: {}, value: {}'.format(
-                        cache_key, function_cache_key, value
+                        cache_key_hashed, cache_key_string, value
                     )
                 )
 
@@ -224,10 +224,10 @@ def cached_instance_method(timeout):
                 # But if it fails on an error from the underlying
                 # cache system, handle it.
                 try:
-                    cache.set(cache_key, value, timeout)
+                    cache.set(cache_key_hashed, value, timeout)
                 except CacheSetError:
                     logger.warning(
-                        f'Error saving value to Cache for Key: {function_cache_key}',
+                        f'Error saving value to Cache for Key: {cache_key_string}',
                         exc_info=True,
                     )
 
@@ -241,14 +241,14 @@ def cached_instance_method(timeout):
             :param kwargs: The kwargs passed into the original function.
             :rtype: None
             """
-            cache_key, _ = self.create_cache_key(*args, **kwargs)
-            cache.delete(cache_key)
+            cache_key_hashed, _ = self.create_cache_key(*args, **kwargs)
+            cache.delete(cache_key_hashed)
 
         def create_cache_key(self, *args, **kwargs):
             # Need to include the first arg (self) in the cache key
             func_name = utils.get_function_name(self.func)
             func_signature = signature(self.func)
-            cache_key, function_cache_key = _get_function_cache_keys(func_name, func_signature, args, kwargs)
-            return cache_key, function_cache_key
+            cache_key_hashed, cache_key_string = _get_function_cache_keys(func_name, func_signature, args, kwargs)
+            return cache_key_hashed, cache_key_string
 
     return wrapper
