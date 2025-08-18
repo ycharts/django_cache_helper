@@ -97,7 +97,6 @@ Thanks goes to these wonderful people.
     <td align="center"><img src="https://avatars.githubusercontent.com/u/2000316?v=4" width="100px;" alt="Kevin Fox"/><br /><sub><b>Kevin Fox</b></sub></td>
     <td align="center"><img src="https://avatars.githubusercontent.com/u/3022071?v=4" width="100px;" alt="Tom Jakeway"/><br /><sub><b>Tom Jakeway</b></sub></td>
     <td align="center"><img src="https://avatars.githubusercontent.com/u/83293?v=4" width="100px;" alt="Ara Anjargolian"/><br /><sub><b>Ara Anjargolian</b></sub></td>
-    <td align="center"><img src="https://avatars.githubusercontent.com/u/15602942?v=4" width="100px;" alt="Hyuckin David Lim"/><br /><sub><b>Hyuckin David Lim</b></sub></td>
     <td align="center"><img src="https://avatars.githubusercontent.com/u/1248116?v=4" width="100px;" alt="James"/><br /><sub><b>James</b></sub></td>
   </tr>
 </table>
